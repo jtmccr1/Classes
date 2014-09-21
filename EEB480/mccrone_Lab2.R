@@ -160,7 +160,7 @@ source("mccrone_intro2.R")
 plot(Light,rmax, xlim=c(0,120), ylim=c(1,4),xlab="light intensity (uE/m2/s)",ylab="maximum growth rate (1/d)",pch=16)
 
 
-######### Exercise 24 - see mccrone_intro2.R 
+######### Exercise 24 & 26 - see mccrone_intro2.R 
 
 ######## Exercise 25 
 
