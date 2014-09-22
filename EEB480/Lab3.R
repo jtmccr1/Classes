@@ -14,7 +14,7 @@ boxplot(speed.spec.dist,xlab="Distance")
 boxplot(t(speed.spec.dist),xlab="Species")
 title("Average speed of seed predation (days)", outer=TRUE)
 par(mfrow=c(1,1))
-## It seems like in general those seeds closest to the forest
+## It seems  in general those seeds closest to the forest
 # are taken fastest, while "abz" and "mmu" seeds are preferentially taken more quickly.
 
 rm(list=ls())
@@ -22,13 +22,13 @@ rm(list=ls())
 
 # These are few plot I have used in my analysis.  The analysis to this point took some time, 
 # and I think it would be too long to include here, so I am loading the R environment with the 
-# needed variables.  I would be more than happy to provide my codes but I think it is beyond the scope of this assingment
+# needed variables.  I would be happy to provide my codes but I think it is beyond the scope of this assingment
 # The data in question comes from a deep sequencing run of dilutions influenza strain WSN33 into PR8 ( another strain).  
 rm(list=ls())
 load("./lab3.RData") 
 
 
-# The output of the initial alingment analysis yeilds a csv with segment,position,and sequencing coverage for all 8 segments the genome
+# The output of the initial alingment analysis yeilds a csv with segment,position,and sequencing coverage for all 8 segments of the genome
 # This is a plot of the coverage for the PB2 segment.  The lines refer to the different treaments of fragmentation used in sequencing
 # Coverage.ls is a list of  data.frames where each item corresponds to the coverage data from a sample.
 coverage_plots<-function(seg,data.ls=coverage.ls){ # This a function so I can make a different plot for each segment
@@ -48,8 +48,8 @@ coverage_plots<-function(seg,data.ls=coverage.ls){ # This a function so I can ma
 coverage_plots(seg = "PB2")
 
 
-# After using the DeepSNV package to estimate true single nucleotide variants (snv)
-# between WSN33 and PR8, I am left with a data frame of called (snv). Here I plot the frequency of snv versus the pvalue given 
+# After using the DeepSNV package to identify  single nucleotide variants (snv)
+# between WSN33 and PR8, I am left with a data frame of called snv. Here I plot the frequency of snv versus the pvalue given 
 #(The null here is that the snv is a sequencing error).
 
 percent_5<-subset(summary.df,Id=="Covaris_5") # Just the summary information for the sample with were snv's should be at 5%
