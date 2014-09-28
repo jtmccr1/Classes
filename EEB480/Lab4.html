@@ -99,7 +99,7 @@ for (k in 1:100000) {
  }
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.024   0.001   0.025</code></pre>
+##   0.025   0.001   0.026</code></pre>
 <pre class="r"><code>system.time({
 x&lt;-1  
 k&lt;-1
@@ -109,7 +109,7 @@ while (k &lt;= 100000) {
  }
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.056   0.001   0.057</code></pre>
+##   0.056   0.002   0.057</code></pre>
 <p>It looks like I was wrong. I guess in the case of the for loop there the vector is made once and then used where as the while loop requires many more steps to rewrite the counter and then test the variable.</p>
 </div>
 </div>
@@ -131,28 +131,28 @@ system.time({
   }
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.063   0.002   0.066</code></pre>
+##   0.063   0.002   0.065</code></pre>
 <pre class="r"><code>#Apply
 system.time({
   x&lt;-array(data=seq.int(loops),dim = c(loops,1))
   apply(x,1,light)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.072   0.001   0.072</code></pre>
+##   0.071   0.000   0.071</code></pre>
 <p>It seems like here for a light calculation the for loop is faster; however, if I apply the function to the x arrary in the column dimension apply is much faster, while making the same number of calculations.</p>
 <pre class="r"><code>system.time({
   x&lt;-array(data=seq.int(loops),dim = c(loops,1))
   apply(x,2,light)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.001   0.000   0.001</code></pre>
+##       0       0       0</code></pre>
 <p>Apply is also faster when I apply it to the same number of calculations by row but when there are less number of rows as shown here. This is because in this example as well as in the one above we allow apply to vectorize the calculations, and the speed seems to be related to the size of the vectors. In the first example there were 10,000, in the second, everything was in 1 vector and here the data is binned into 5.</p>
 <pre class="r"><code>system.time({
   x&lt;-array(data=seq.int(loops),dim = c(loops/5,5))
   apply(x,1,light)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.015   0.001   0.015</code></pre>
+##   0.014   0.000   0.015</code></pre>
 <p><em>Looking at heavy calculations</em></p>
 <pre class="r"><code>loops&lt;-10000
 heavy&lt;-function(x){
@@ -166,23 +166,23 @@ system.time({
   }
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##  31.780   0.033  31.832</code></pre>
+##  31.774   0.024  31.814</code></pre>
 <pre class="r"><code>#Apply
 system.time({
   x&lt;-array(data=seq.int(loops),dim = c(loops,1))
   apply(x,1,heavy)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##  31.617   0.027  31.733</code></pre>
+##  31.543   0.031  31.589</code></pre>
 <p>In this example I’m not taking advantage of the vectorization of apply as each row contains only one element. Under these conditions, apply and for loops have about the same efficiency. But here, where I vectorize The calculation is much faster in apply.</p>
 <pre class="r"><code>system.time({
   x&lt;-array(data=seq.int(loops),dim = c(loops/5,5))
   apply(x,1,heavy)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   6.301   0.003   6.308</code></pre>
+##   6.321   0.005   6.331</code></pre>
 <p>In general for and apply are comperable when using light functions over matrixes that are largely one dimensional. Also for completeness, there is little noticable difference when the number of loops is relatively small as shown here.</p>
-<pre class="r"><code>loops&lt;-10
+<pre class="r"><code>loops&lt;-100
 light&lt;-function(x){
   runif(100,0,1)
   x
@@ -194,14 +194,14 @@ system.time({
   }
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##       0       0       0</code></pre>
+##   0.001   0.000   0.000</code></pre>
 <pre class="r"><code>#Apply
 system.time({
-  x&lt;-array(data=seq.int(loops),dim = c(loops,1))
+  x&lt;-array(data=seq.int(loops),dim = c(loops/5,5))
   apply(x,1,light)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.001   0.000   0.001</code></pre>
+##       0       0       0</code></pre>
 </div>
 </div>
 
