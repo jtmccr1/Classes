@@ -1,16 +1,15 @@
 ---
-title: "Visualizing data with ggplot2"
-author: "Aaron A. King"
-date: "09/21/2014"
+title: "Gun Availability and Crime"
+author: "JT McCrone"
+date: "09/28/2014"
 output: html_document
 ---
 
-In this document, we'll practice visualizing data using *ggplot2*.
+The goal of this report is to explore data on gun availability crime rate as provided originally at  [this student resource site](http://wps.aw.com/aw_stock_ie_2/0,12040,3332253-,00.html) for the book Stock & Watson (2011) Introduction to Econometrics (Addison-Wesley).  
 
 ### Loading packages and data
 
-First, we'll load some packages.
-If the following generates an error, you may need to install these packages.
+First I will load the packages I will be using in the exploration.
 
 ```{r}
 require(ggplot2)
@@ -18,82 +17,45 @@ require(plyr)
 require(reshape2)
 ```
 
-Now, we'll load some data.
+Next I load the data.
 ```{r,load-data,cache=TRUE}
 course.url <- "http://kinglab.eeb.lsa.umich.edu/480"
-datafile <- paste(course.url,"data/titanic.csv",sep='/')
+datafile <- paste(course.url,"data/guns.csv",sep='/')
 dat <- read.csv(datafile,comment.char="#",
-                colClasses=c(class='factor',sex='factor',class="Date"))
+                colClasses=c(state='factor',law='factor'))
 sapply(dat,class)
 head(dat)
 ```
-Note, it was useful to me to first run `file.show()` on the data file, to read the comments there.
-These are just the raw data from the seed-predation component of the study by [Duncan and Duncan (2000)](http://dx.doi.org/10.1111/j.1744-7429.2000.tb00445.x).
 
 ### Examining the data.
 
-Number of species, stations, and distances;
-also, number of distances per station, species per station, and stations per species/distance pair:
-```{r,summaries}
-summarize(dat,
-          nspp=length(unique(species)),
-          nsta=length(unique(station)),
-          ndist=length(unique(dist))
-          )
-ddply(dat,~station,summarize,nspp=length(unique(species)),ndist=length(unique(dist)))
-daply(dat,~species+dist,summarize,nsta=length(unique(station)))
-```
+We know from the file heading that data is inlcuded for each state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per 10^5 individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American(ages 10-64), Caucasion(ages 10-64) and male(ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  
 
+Before I begin plotting the data I think it would be useful to reshape the data into a long format where one columne contains all the crime data.  It might also be usefull down the line to have the population percentages as one variable as well.  We'll see if I keep that though.  I'm not sure if I will at this point.
 
-Let us plot some typical replicates.  
-```{r, replicates}
-x <- subset(dat,station==17 & dist==10)
-ggplot(data=x,mapping=aes(x=date,y=seeds))+geom_point()+geom_step()
-ggplot(data=subset(dat,station==17),mapping=aes(x=date,y=seeds,group=dist,color=dist))+geom_point()+geom_step()
-ggplot(data=subset(dat,station %in% 1:4),mapping=aes(x=date,y=seeds,group=dist,color=dist))+
-  geom_point()+geom_step()+facet_wrap(~station)
-```
-
-### Estimating rates
-
-Extracting time to removal of all seeds.
-First, exclude replicates for which either no seeds were laid out or not all seeds were taken:
 ```{r}
-ddply(dat,~station+dist+species,subset,max(seeds)>0 & min(seeds)==0) -> dat1
-```
-Now, we want to consider that the time after there were no seeds present contributes no information about the seed predation process.
-So, we should eliminate those observations:
-```{r}
-ddply(dat1,~station+dist+species,mutate,avail=c(NA,head(seeds,-1))) -> dat1
-ddply(dat1,~station+dist+species,subset,is.na(avail) | avail>0) -> dat2
+
+
+
+
 ```
 
-Now, we want to know how many seeds were taken at each station/dist/species combination and how long it took:
-```{r,rates}
-ddply(dat2,~station+dist+species,summarize,
-      max(seeds),
-      min(seeds),
-      taken=max(seeds)-min(seeds),
-      time=diff(range(date)),
-      rate=taken/as.numeric(time)
-      ) -> dat2
-head(dat2)
-```
-Note that the units of the `rate` variable are seeds/day. 
-Now we can summarize these rates across replicates:
+### Looking at rates 
+I'll start by looking at the crime rates across the years stratified by .....
+
+
 ```{r}
-ddply(dat2,~species+dist,summarize,
-      meanRate=mean(rate),
-      sdRate=sd(rate),
-      semRate=sdRate/sqrt(length(rate))
-      )
+dat<-rename(dat,c(law='concealed_carry'))
+head(dat)
+pl<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=concealed_carry))+geom_line()
+print(pl)
+
+
+
+
+
+
 ```
-Alternatively,
-```{r}
-daply(dat2,~species+dist,summarize,
-      meanRate=mean(rate),
-      sdRate=sd(rate),
-      semRate=sdRate/sqrt(length(rate))
-      )
-```
+
+
 
