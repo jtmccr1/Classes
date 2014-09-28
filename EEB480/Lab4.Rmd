@@ -1,0 +1,171 @@
+---
+title: "Lab 4"
+author: "JT McCrone"
+date: "September 27, 2014"
+output: html_document
+---
+# Exercise 10
+Under what circumstances would you expect to see while loops be more efficient than for loops? Test your hypothesis with a simple example.
+
+## Answer : 
+My intuition is that while loops will be more efficient when the number of loops needed is unkown, and so the number of loops can be set based on conditions allowing for the minimun number of loops to be computed. Here is the example from class.  
+
+```{r}
+
+x<-system.time({
+phi <- 1
+conv <- FALSE 
+c<-1
+w<-c()
+while (!conv) {
+  phi.new <- 1+1/phi
+  conv <- phi==phi.new
+  phi <- phi.new
+  w[c]<-phi
+}
+});print(x)
+
+y<-system.time({
+phi <- 1
+c<-1
+f<-c()
+for (k in 1:1000) {
+  phi <- 1+1/phi
+  f[c]<-phi
+ }
+
+});print(y)
+
+
+```
+Besides this I'm not sure what else would be different between a for loop and while loop. I don't think there is anything inherently faster in a while loop.  Perhaps there are cases where the calculation involves an extra step in a for loop and over many runs this adds up. Alternatively over many loops creating the large vector to count in a for loop could take longer than the updating and checking done in the same while loop 
+
+
+```{r}
+system.time({
+x<-1  
+for (k in 1:100000) {
+  y<-x+1
+ }
+})
+system.time({
+x<-1  
+k<-1
+while (k <= 100000) {
+  y<-x+1
+  k<-k+1
+ }
+})
+
+
+```
+It looks like I was wrong.  I guess in the case of the for loop there the vector is made once and then used where as the while loop requires many more steps to rewrite the counter and then test the variable.
+
+
+
+# Exercise 11
+Do some timing tests on apply and compare them with the results of looping. Can you say anything in generality about when looping and apply are com- parable in speed? Be sure to use large enough matrices so that your timing results are stable and to do the comparisons with both ‘light’ and ‘heavy’ functions.
+
+## Answer
+For this analysis I'll be using runif(100,0,1) and runif(1000000,0,1) as light and heavey functions respectably.
+
+
+```{r}
+loops<-10000
+light<-function(x){
+  runif(100,0,1)
+  x
+}
+
+system.time({
+  for(  x in seq.int(loops)){
+  light(x)
+  }
+})
+
+#Apply
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops,1))
+  apply(x,1,light)
+})
+
+
+
+```
+
+It seems like here for a light calculation the for loop is faster; however, if I apply the function to the x arrary in the column dimension apply is much faster, while making the same number of calculations.
+
+```{r}
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops,1))
+  apply(x,2,light)
+})
+```
+Apply is also faster when I apply it to the same number of calculations by row but when there are less number of rows as shown here.  This is because in this example as well as in the one above we allow apply to vectorize the calculations, and the speed seems to be related to the size of the vectors.  In the first example there were 10,000, in the second, everything was in  1 vector and here the data is binned into 5.
+```{r}
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops/5,5))
+  apply(x,1,light)
+})
+```
+
+
+
+*Looking at heavy calculations*
+```{r}
+loops<-10000
+heavy<-function(x){
+  runif(100000,0,1)
+  x
+}
+
+system.time({
+  for(  x in seq.int(loops)){
+  heavy(x)
+  }
+})
+
+#Apply
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops,1))
+  apply(x,1,heavy)
+})
+
+
+
+```
+In this example I'm not taking advantage of the vectorization of apply as each row contains only one element.  Under these conditions, apply and for loops have about the same efficiency.  But here, where I vectorize The calculation is much faster in apply.
+
+```{r}
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops/5,5))
+  apply(x,1,heavy)
+})
+
+
+
+```
+In general for and apply are comperable when using light functions over matrixes that are largely one dimensional. Also for completeness, there is little noticable difference when the number of loops is relatively small as shown here.
+```{r}
+loops<-100
+light<-function(x){
+  runif(100,0,1)
+  x
+}
+
+system.time({
+  for(  x in seq.int(loops)){
+  light(x)
+  }
+})
+
+#Apply
+system.time({
+  x<-array(data=seq.int(loops),dim = c(loops/5,5))
+  apply(x,1,light)
+})
+
+
+
+```
+

@@ -31,6 +31,15 @@ load("./lab3.RData")
 # The output of the initial alingment analysis yeilds a csv with segment,position,and sequencing coverage for all 8 segments of the genome
 # This is a plot of the coverage for the PB2 segment.  The lines refer to the different treaments of fragmentation used in sequencing
 # Coverage.ls is a list of  data.frames where each item corresponds to the coverage data from a sample.
+fill.in<-function(x,endpoint=size,seg_name=seg){
+  if(nrow(x) < endpoint){
+    diff <-endpoint-nrow(x)
+    m<-data.frame(Segment=rep(seg_name,times=diff),Position=rep(0,times=diff),Coverage=rep(0,times=diff))
+    x<-rbind(x,m)
+  }
+  return(x)
+}
+
 coverage_plots<-function(seg,data.ls=coverage.ls){ # This a function so I can make a different plot for each segment
   data.ls<-lapply(data.ls,function(x,segment=seg){ y<- x[x$Segment==segment,]; return(y)}) #Just get the segments of interest
   
