@@ -31,14 +31,57 @@ head(dat)
 
 We know from the file heading that data is inlcuded for every state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per $10^5$ individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American (ages 10-64), Caucasion (ages 10-64) and male (ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  To the best of my knowledge the presence of this law is indicative of more relaxed gun regulation  
 
-Before I begin plotting the data I think it would be useful to reshape the data into a long format where one columne contains all the crime data.  It might also be usefull down the line to have the population percentages as one variable as well.  We'll see if I keep that though.  I'm not sure if I will at this point.
+
+It might be helpful to break the data up into regions.  I am doing that here using information from the census bearua.
+```{r}
+
+census_file<-"http://www.census.gov/popest/data/national/totals/2013/files/NST_EST2013_ALLDATA.csv"
+cen.dat<-read.csv(url(census_file))
+sapply(cen.dat,class)
+#There are many columns here but we only want the region and state name data
+cen.dat<-subset(cen.dat,select=c("REGION","NAME"))
+#But the region is a number factor so here we'll replace that number 1-4 with the name
+cen.dat<-mutate(cen.dat,REGION=as.integer(REGION))
+cen.dat$REGION[cen.dat$REGION==2]<-"Northeast"
+cen.dat$REGION[cen.dat$REGION==3]<-"Midwest"
+cen.dat$REGION[cen.dat$REGION==4]<-"South"
+cen.dat$REGION[cen.dat$REGION==5]<-"West"
+
+cen.dat<-rename(cen.dat,c(REGION="region",NAME="state"))
+
+dat<-join(dat,cen.dat,by="state",type='left')
+head(dat)
+```
+Now we can look at aggregated years by region.
+```{r}
+ave_crimes<- ddply(dat,~state,summarize,mean_vio=mean(violent),mean_murder=mean(murder),mean_rob=mean(robbery))
+ave_crimes<-join(ave_crimes,cen.dat,by="state",type="left")
+south<-subset(ave_crimes,region=="South")
+ggplot(ave_crimes,mapping=aes(x=state,y=mean_vio,fill=region))+geom_bar(stat="identity")+coord_flip()
+
+```
+
+
+
 
 ```{r}
 
-ddply(dat,~state,summarize,mean)
-
-
+laws_status<-function(x){
+  y<-length(unique(x))
+  if(y==2){
+    z="Switched"
+  }else if(y==1){
+    z="Same"
+  }
+}
+laws_status<- ddply(dat,~state,summarize,law_stability=laws_status(law))
+dat<-join(dat,laws_status,by='state',type='left')
+p1<-ggplot(data=subset(dat,law_stability=="Switched"),mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")+facet_wrap(~region)
+print(p1)
 ```
+
+
+
 
 ### Looking at rates 
 I'll start by looking at the various crime rates in each state across the years.  The coloring here indicates the presence or absence of "shall issue" law. 
