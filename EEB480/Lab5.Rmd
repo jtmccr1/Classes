@@ -17,7 +17,7 @@ require(plyr)
 require(reshape2)
 ```
 
-Next I load the data.
+Next I'll load the data.
 ```{r,load-data,cache=TRUE}
 course.url <- "http://kinglab.eeb.lsa.umich.edu/480"
 datafile <- paste(course.url,"data/guns.csv",sep='/')
@@ -29,33 +29,69 @@ head(dat)
 
 ### Examining the data.
 
-We know from the file heading that data is inlcuded for each state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per 10^5 individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American(ages 10-64), Caucasion(ages 10-64) and male(ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  
+We know from the file heading that data is inlcuded for every state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per $10^5$ individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American (ages 10-64), Caucasion (ages 10-64) and male (ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  To the best of my knowledge the presence of this law is indicative of more relaxed gun regulation  
 
 Before I begin plotting the data I think it would be useful to reshape the data into a long format where one columne contains all the crime data.  It might also be usefull down the line to have the population percentages as one variable as well.  We'll see if I keep that though.  I'm not sure if I will at this point.
 
 ```{r}
 
-
+ddply(dat,~state,summarize,mean)
 
 
 ```
 
 ### Looking at rates 
-I'll start by looking at the crime rates across the years stratified by .....
+I'll start by looking at the various crime rates in each state across the years.  The coloring here indicates the presence or absence of "shall issue" law. 
 
 
 ```{r}
-dat<-rename(dat,c(law='concealed_carry'))
-head(dat)
-pl<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=concealed_carry))+geom_line()
-print(pl)
+p1<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")
+print(p1)
 
+p2<-ggplot(data=dat,mapping=aes(x=year,y=murder,group=state,color=law))+geom_line() + ggtitle("Murder Rate")
+print(p2)
 
+p3<-ggplot(data=dat,mapping=aes(x=year,y=robbery,group=state,color=law))+geom_line() + ggtitle("Robbery Rate")
+print(p3)
+```
 
+For the most part these plots are rather busy and it is hard to gleam much information from them at this point; however, I do notice a few trends at this points.  Fist it seems that in all cases one state has a much higher rate than the majority of the others, but is has yet to be shown that this state is the same in all cases.  There also seem to be ossilation in crime rates with peaks around 1980 and 1995.  It would be intersting to see if these flucuations mirrored in some of the other data.  Finally it seems that while some states had "shall issue" law over the entire course of the experiment, some developed the law at later years.
 
+### What is the state the has such a high rate of crime and is it the same in each category
+
+To look at this question I will plot the average crime rates of each state over the course of the experiment.
+```{r}
+mean
 
 
 ```
 
 
+
+
+
+
+
+
+pl<-ggplot(data=dat,mapping=aes(x=prisoners,y=violent, color = law))+geom_point()
+print(pl)
+
+pl<-ggplot(data=dat,mapping=aes(x=income,y=violent, color = law))+geom_point()
+print(pl)
+
+pl<-ggplot(data=dat,mapping=aes(x=male,y=violent, color = law))+geom_point()
+print(pl)
+
+pl<-ggplot(data=dat,mapping=aes(x=afam,y=violent, color = law))+geom_point()
+print(pl)
+
+pl<-ggplot(data=dat,mapping=aes(x=cauc,y=violent, color = law))+geom_point()
+print(pl)
+
+pl<-ggplot(data=dat,mapping=aes(x=population,y=violent, color = law))+geom_point()
+print(pl)
+pl<-ggplot(data=dat,mapping=aes(x=density,y=violent, color = law))+geom_point()
+print(pl)
+
+```
 
