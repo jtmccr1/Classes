@@ -11,7 +11,7 @@ The goal of this report is to explore data on gun availability crime rate as pro
 
 First I will load the packages I will be using in the exploration.
 
-```{r}
+```{r,echo=FALSE}
 require(ggplot2)
 require(plyr)
 require(reshape2)
@@ -31,7 +31,7 @@ head(dat)
 
 We know from the file heading that data is inlcuded for every state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per $10^5$ individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American (ages 10-64), Caucasion (ages 10-64) and male (ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  To the best of my knowledge the presence of this law is indicative of more relaxed gun regulation  
 
-
+Initially I tried to look at the rate of violent crimes over time; however, the plots were much to busy as.  Here I am gathering more data from the census bearua and using it to split the states up into regions.  
 It might be helpful to break the data up into regions.  I am doing that here using information from the census bearua.
 ```{r}
 
@@ -52,20 +52,66 @@ cen.dat<-rename(cen.dat,c(REGION="region",NAME="state"))
 dat<-join(dat,cen.dat,by="state",type='left')
 head(dat)
 ```
-Now we can look at aggregated years by region.
+
 ```{r}
-ave_crimes<- ddply(dat,~state,summarize,mean_vio=mean(violent),mean_murder=mean(murder),mean_rob=mean(robbery))
+p1<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")+facet_wrap(~region)
+print(p1)
+```
+
+Initially it seems that this one southern state that has a much higher violent crime rate than the others.  By looking at the average rate over these years we can see that this "state" is Washington D.C.  As we are looking at a crime rate the violence in the nation's capital is blown a little out of proportion by the low population.  
+
+```{r}
+ave_crimes<- ddply(dat,~state,summarize,mean_vio=mean(violent),mean_murder=mean(murder),mean_rob=mean(robbery),population=mean(population))
 ave_crimes<-join(ave_crimes,cen.dat,by="state",type="left")
 south<-subset(ave_crimes,region=="South")
-ggplot(ave_crimes,mapping=aes(x=state,y=mean_vio,fill=region))+geom_bar(stat="identity")+coord_flip()
+ggplot(south,mapping=aes(x=state,y=mean_vio))+geom_bar(stat="identity")+coord_flip()
+ggplot(south,mapping=aes(x=state,y=population))+geom_bar(stat="identity")+coord_flip()
+```
+
+
+### How has the popularity of shall issue laws changed over time
+
+First I will look at the country level and to see how the number of states with "shall issue" laws have increased over time, and possibly look to elucidate reasons behind shifts.
+
+
+```{r}
+
+yes_law<-ddply(dat,~year,summarize,easy_gun=length(which(law=="yes")))
+
+ggplot(yes_law,mapping=aes(x=year,y=easy_gun))+geom_step()
+
+```
+We can see from this plot that the number of states with "shall issue" has drastically increased overtime with most of the growth after 1990.  It seems like there was a large rise in violent crime between the years 1985 and 1990, which may have spurred this rise.
+
+```{r}
+us_rates<-ddply(dat,~year,summarize, us_violent=sum(violent),us_murdur=sum(murder),us_robbery=sum(robbery))
+us_rates<-melt(us_rates,id.vars="year",value.name="rate",variable.name="crime")
+
+ggplot(us_rates,mapping=aes(x=year,y=rate,group=crime,color=crime)) + geom_line()+scale_y_log10()
 
 ```
 
 
+I am now working on the hypothesis that this rise in crime triggered more states to adapt lenient gun control policies.  I think this hypothesis is only plausible if there was evidence previosly for lower crime rates in states with less stringent gun control.  
 
 
 ```{r}
 
+se <- function(x) sqrt(var(x)/length(x)) # For standard error
+older<-subset(dat,year<=1985)
+older<-ddply(older,~law, summarize, se_v=se(violent),se_m=se(murder),se_r=se(robbery),violent=mean(violent),murder=mean(murder),robbery=mean(robbery))
+limits<-aes(ymax=violent+se_v,ymin=violent-se_v)
+ggplot(older,mapping=aes(x=law,y=violent))+geom_bar(stat="identity",fill="blue")+geom_errorbar(limits)
+
+
+
+```
+
+It seems plausible given the data that prior to 1985 lenient gun control policies are corrilated with lower rates of violent crimes.  However, let's look at the states that that have these policies. [look at income and crime rates!!]
+
+If more relaxed laws on concealed carry decrease the violent crimes in a state we expect to that there would be decreased crime in states that adapt the concealed carry laws and that this decrease is not found in states that stringent laws over the course of the study.
+
+```{r}
 laws_status<-function(x){
   y<-length(unique(x))
   if(y==2){
@@ -74,67 +120,30 @@ laws_status<-function(x){
     z="Same"
   }
 }
+
 laws_status<- ddply(dat,~state,summarize,law_stability=laws_status(law))
 dat<-join(dat,laws_status,by='state',type='left')
-p1<-ggplot(data=subset(dat,law_stability=="Switched"),mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")+facet_wrap(~region)
-print(p1)
+
+
+
+ggplot(dat,mapping=aes(x=year,y=violent,color=law,group=state))+geom_line()+facet_wrap(~law_stability)
 ```
 
+It seems like there is decrease in violent crime rate in the states which adapted less stringent laws; however, by this rough estimation it seems like there is a similar rise and fall in states that did not adapt differing laws.  
 
-
-
-### Looking at rates 
-I'll start by looking at the various crime rates in each state across the years.  The coloring here indicates the presence or absence of "shall issue" law. 
-
+### What drives crime rates and does gun availability affect these rates
+So this impact of gun availablity on violent crime rates is still open.  There seems to be similar trends in violent crime rate ( as well as murder and robbery for that matter) in all states over time. And to thus far I have not found any other variables that have similar osilations.    
 
 ```{r}
-p1<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")
-print(p1)
 
-p2<-ggplot(data=dat,mapping=aes(x=year,y=murder,group=state,color=law))+geom_line() + ggtitle("Murder Rate")
-print(p2)
+ggplot(dat,mapping=aes(x=afam,y=violent,color=law))+geom_point()+facet_wrap(~region)
+ggplot(dat,mapping=aes(x=cauc,y=violent,color=law))+geom_point()+facet_wrap(~region)
+ggplot(dat,mapping=aes(x=male,y=violent,color=law))+geom_point()+facet_wrap(~region)
+ggplot(dat,mapping=aes(x=prisoners,y=violent,color=law))+geom_point()+facet_wrap(~region)
 
-p3<-ggplot(data=dat,mapping=aes(x=year,y=robbery,group=state,color=law))+geom_line() + ggtitle("Robbery Rate")
-print(p3)
-```
-
-For the most part these plots are rather busy and it is hard to gleam much information from them at this point; however, I do notice a few trends at this points.  Fist it seems that in all cases one state has a much higher rate than the majority of the others, but is has yet to be shown that this state is the same in all cases.  There also seem to be ossilation in crime rates with peaks around 1980 and 1995.  It would be intersting to see if these flucuations mirrored in some of the other data.  Finally it seems that while some states had "shall issue" law over the entire course of the experiment, some developed the law at later years.
-
-### What is the state the has such a high rate of crime and is it the same in each category
-
-To look at this question I will plot the average crime rates of each state over the course of the experiment.
-```{r}
-mean
 
 
 ```
 
 
-
-
-
-
-
-
-pl<-ggplot(data=dat,mapping=aes(x=prisoners,y=violent, color = law))+geom_point()
-print(pl)
-
-pl<-ggplot(data=dat,mapping=aes(x=income,y=violent, color = law))+geom_point()
-print(pl)
-
-pl<-ggplot(data=dat,mapping=aes(x=male,y=violent, color = law))+geom_point()
-print(pl)
-
-pl<-ggplot(data=dat,mapping=aes(x=afam,y=violent, color = law))+geom_point()
-print(pl)
-
-pl<-ggplot(data=dat,mapping=aes(x=cauc,y=violent, color = law))+geom_point()
-print(pl)
-
-pl<-ggplot(data=dat,mapping=aes(x=population,y=violent, color = law))+geom_point()
-print(pl)
-pl<-ggplot(data=dat,mapping=aes(x=density,y=violent, color = law))+geom_point()
-print(pl)
-
-```
 
