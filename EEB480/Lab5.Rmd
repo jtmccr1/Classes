@@ -5,7 +5,7 @@ date: "09/28/2014"
 output: html_document
 ---
 
-The goal of this report is to explore data on gun availability crime rate as provided originally at  [this student resource site](http://wps.aw.com/aw_stock_ie_2/0,12040,3332253-,00.html) for the book Stock & Watson (2011) Introduction to Econometrics (Addison-Wesley).  
+The goal of this report is to explore data on gun availability crime rate as provided originally at  [this student resource site](http://wps.aw.com/aw_stock_ie_2/0,12040,3332253-,00.html) for the book Stock & Watson (2011) Introduction to Econometrics (Addison-Wesley).  The data was originally used in a paper by John Donohue and Ian Ayres titled "Shooting Down the 'More Guns Less Crime' Hypothesis".  Besides the titled I do not know how the data was orginially interpretted, and am hoping to use this as an oportunity to test my exploration of a data set that is too big to simply stare at and understand.  I think my analysis would  benefit from a more advanced statistical approach, a greater understanding of the relationship between guns and crime, and experience in sociological research.  But this was a fun exercise and I while I don't think I unearthed any earth shattering findings, at least my R skills have improved.
 
 ### Loading packages and data
 
@@ -31,13 +31,12 @@ head(dat)
 
 We know from the file heading that data is inlcuded for every state in the union as well as Washington D.C. for each year from 1977-1999.  The rates of violent crimes, murder, and robbery are provided as incidents per $10^5$ individuals in the population.  Afam, cauc, and male refer to the percentage of the population that is African American (ages 10-64), Caucasion (ages 10-64) and male (ages 10-29) respectively.  Income refers to the per capita income and density is population density in thousand/square mile.  Finally, law refers to the presence (yes) or absence (no) of a shall issue concealed carry law in effect.  To the best of my knowledge the presence of this law is indicative of more relaxed gun regulation  
 
-Initially I tried to look at the rate of violent crimes over time; however, the plots were much to busy as.  Here I am gathering more data from the census bearua and using it to split the states up into regions.  
-It might be helpful to break the data up into regions.  I am doing that here using information from the census bearua.
-```{r}
+Initially I tried to look at the rate of violent crimes over time ( murder and robbery rates mirror these trends); however, the plots were too crowded to reveal any intelligible infromation.  Here I am gathering more data from the census bearua and using it to split the states up into regions.  
+```{r,echo=FALSE}
 
 census_file<-"http://www.census.gov/popest/data/national/totals/2013/files/NST_EST2013_ALLDATA.csv"
 cen.dat<-read.csv(url(census_file))
-sapply(cen.dat,class)
+#sapply(cen.dat,class)
 #There are many columns here but we only want the region and state name data
 cen.dat<-subset(cen.dat,select=c("REGION","NAME"))
 #But the region is a number factor so here we'll replace that number 1-4 with the name
@@ -50,26 +49,66 @@ cen.dat$REGION[cen.dat$REGION==5]<-"West"
 cen.dat<-rename(cen.dat,c(REGION="region",NAME="state"))
 
 dat<-join(dat,cen.dat,by="state",type='left')
-head(dat)
 ```
 
 ```{r}
-p1<-ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")+facet_wrap(~region)
-print(p1)
+ggplot(data=dat,mapping=aes(x=year,y=violent,group=state,color=law))+geom_line() + ggtitle("Violent Crime Rate")+facet_wrap(~region)+ggtitle("Violent Crime in the US")+xlab("Year") + ylab("Violent Crime Rate")
 ```
 
-Initially it seems that this one southern state that has a much higher violent crime rate than the others.  By looking at the average rate over these years we can see that this "state" is Washington D.C.  As we are looking at a crime rate the violence in the nation's capital is blown a little out of proportion by the low population.  
+There is still a lot of data in this graph; however, we can make some initial observations regarding the data set. It seems that  one southern state  has a much higher violent crime rate than the others.  By looking at the average rate over these years we can see that this "state" is Washington D.C.  As we are looking at a crime rate, the violence in the nation's capital is blown a little out of proportion by the low population in the region.  
 
 ```{r}
-ave_crimes<- ddply(dat,~state,summarize,mean_vio=mean(violent),mean_murder=mean(murder),mean_rob=mean(robbery),population=mean(population))
+se <- function(x) sqrt(var(x)/length(x)) # For standard error
+
+ave_crimes<- ddply(dat,~state,summarize,mean_vio=mean(violent),mean_murder=mean(murder),mean_rob=mean(robbery),mean_pop=mean(population),se_vio=se(violent),se_pop=se(population))
+
 ave_crimes<-join(ave_crimes,cen.dat,by="state",type="left")
 south<-subset(ave_crimes,region=="South")
-ggplot(south,mapping=aes(x=state,y=mean_vio))+geom_bar(stat="identity")+coord_flip()
-ggplot(south,mapping=aes(x=state,y=population))+geom_bar(stat="identity")+coord_flip()
+
+crime_lim<-aes(ymax=mean_vio+se_vio,ymin=mean_vio-se_vio)
+pop_lim<-aes(ymax=mean_pop+se_pop,ymin=mean_pop-se_pop)
+ggplot(south,mapping=aes(x=state,y=mean_vio))+geom_bar(stat="identity",fill="blue")+coord_flip()+ggtitle(" Mean Violent Crimes Rate for Southern States")+ylab("Violent Crime Rate")+geom_errorbar(crime_lim)
+ggplot(south,mapping=aes(x=state,y=mean_pop))+geom_bar(stat="identity",fill='blue')+coord_flip()+ggtitle("Mean Population in Southern States")+xlab("Population")+geom_errorbar(pop_lim)
+```
+
+A brief view of the data also seems reveals that many states have changed their laws overtime to favor more lenient gun regulation.  I will spend some time investigating this issue a little later.
+## Does gun availabilty decrease crime?
+
+This brings me to the heart of the data set, and the reason it was developed (as far as I can tell).  Does gun availablity decrease the number of viloent crimes in state?  Based on the title of the paper this data was originally used in, I think there is evidence in the data set to suggest that lenient gun laws do not discourage violent I just have to find it.  
+
+I will start with the hypothesis that guns do discourage violent crimes and so "shall issue" laws decrease crime rates and set out to reject this hypothesis.  As I hinted in the start of this report, we'll be using a graphical approach and won't actually be running a full statistical analysis.
+
+### Are is there less crime in states with "shall issue" laws?
+Taking a basic approach, all thing equal ( which admittedly they probably are not) if "shall issue" laws decrease violent crimes that should be apparent in the violent crime rates in each of the cases accross time.
+
+```{r}
+ggplot(dat,mapping=aes(x=law,y=violent))+geom_violin()+ggtitle("The Effect of State Law on Crime Rate")+xlab("Presence of Shall issue Law")+ylab("Violent Crime Rate")
 ```
 
 
-### How has the popularity of shall issue laws changed over time
+Looking at the distributions above it does seem that there is perhaps less crime in the pressence of a "shall issue" law; however, if there is a difference, it is not substantial and warrants further investigation.
+
+### Does the presence of "shall issue" laws affect the role population density has on violent crime rate?
+
+The data suggest there is a positive correlation between population density and violent crime rates.  Maybe "shall issue" laws decrease this correlation.
+
+```{r}
+
+ggplot(dat,mapping=aes(x=density,y=violent,color=law))+geom_point()+scale_y_log10()+scale_x_log10()+ylab("Violent Crime Rate")+xlab("Population Density")+ggtitle("Population Density and Crime by Law")
+
+
+
+```
+
+If population density is correlated with violent crime rate, and "shall issue" laws decrease this rate, we would expect the lower rates of crime in states with "shall issue" laws even when the population density of states is similar.  From the graph above it is not readily apparent that this is the case.  In fact the violent crime rates cluster more by state than by law status as shown below.
+
+```{r}
+ggplot(dat,mapping=aes(x=density,y=violent,color=state))+geom_point()+scale_y_log10()+scale_x_log10()+theme(legend.position="none")+ylab("Violent Crime Rate")+xlab("Population Density")+ggtitle("Population Density and Crime by State")
+```
+
+
+A look at the relationship between the other data metrics and violent crimes gives similar results, and doesn't shead too much light on the question of gun laws and crime.  This is mostlikely because crime is complex and the social variables which influence crime rates are varied.  Perhaps if I stratified the data or controlled for these variables I could be more confident in testing the hypothesis that "shall issue" laws decrease violent crime rates, but that might be beyond the scope of this report, and certainly beyond my present understanding of gun issues.
+### How has the popularity of shall issue laws changed over time?
 
 First I will look at the country level and to see how the number of states with "shall issue" laws have increased over time, and possibly look to elucidate reasons behind shifts.
 
@@ -78,72 +117,66 @@ First I will look at the country level and to see how the number of states with 
 
 yes_law<-ddply(dat,~year,summarize,easy_gun=length(which(law=="yes")))
 
-ggplot(yes_law,mapping=aes(x=year,y=easy_gun))+geom_step()
+ggplot(yes_law,mapping=aes(x=year,y=easy_gun))+geom_step()+ggtitle("The Increase in Shall Issue Staes")+xlab("Year")+ylab("Number of Shall Issue States")
 
 ```
-We can see from this plot that the number of states with "shall issue" has drastically increased overtime with most of the growth after 1990.  It seems like there was a large rise in violent crime between the years 1985 and 1990, which may have spurred this rise.
+We can see from this plot that the number of states with "shall issue" has drastically increased overtime with most of the growth after 1990.  My hypothesis is that this rise was due to the belief that an increase in guns would lead to a decrease in crime, coupled with an increased crime rate. (Remember that I'm not a socialogist and I am just trying to follow my nose)
 
+Looking at the average crime rates over the years we can see there was an increase in violent crimes, murder, and robbery in the years leading up to the 1990s.  
 ```{r}
-us_rates<-ddply(dat,~year,summarize, us_violent=sum(violent),us_murdur=sum(murder),us_robbery=sum(robbery))
+us_rates<-ddply(dat,~year,summarize, us_violent=mean(violent),us_murder=mean(murder),us_robbery=mean(robbery))
 us_rates<-melt(us_rates,id.vars="year",value.name="rate",variable.name="crime")
 
-ggplot(us_rates,mapping=aes(x=year,y=rate,group=crime,color=crime)) + geom_line()+scale_y_log10()
+
+us_se<-ddply(dat,~year,summarize, us_violent=se(violent),us_murder=se(murder),us_robbery=se(robbery))
+us_se<-melt(us_se,id.vars="year",value.name="se",variable.name="crime")
+
+mean_crimes<-join(us_rates,us_se,by=c("year","crime"),type="left")
+limits<-aes(ymax=rate+se,ymin=rate-se)
+ggplot(mean_crimes,mapping=aes(x=year,y=rate,group=crime,color=crime)) + geom_line()+scale_y_log10()+geom_errorbar(limits)+ggtitle("Mean Crime Rates in the US")+xlab("Year")+ylab("Crime Rate")
 
 ```
 
 
-I am now working on the hypothesis that this rise in crime triggered more states to adapt lenient gun control policies.  I think this hypothesis is only plausible if there was evidence previosly for lower crime rates in states with less stringent gun control.  
+I think this rise in crime would only trigger a decrease in gun regulation if there was previous evidence suggesting that states with less stringet gun control have lower crime rates.  
 
 
 ```{r}
 
-se <- function(x) sqrt(var(x)/length(x)) # For standard error
-older<-subset(dat,year<=1985)
+older<-subset(dat,year<1990)
 older<-ddply(older,~law, summarize, se_v=se(violent),se_m=se(murder),se_r=se(robbery),violent=mean(violent),murder=mean(murder),robbery=mean(robbery))
 limits<-aes(ymax=violent+se_v,ymin=violent-se_v)
-ggplot(older,mapping=aes(x=law,y=violent))+geom_bar(stat="identity",fill="blue")+geom_errorbar(limits)
-
-
+ggplot(older,mapping=aes(x=law,y=violent))+geom_bar(stat="identity",fill="blue")+geom_errorbar(limits)+ggtitle("Violent Crime Rates prior to 1990")+xlab("Presence of Shall Issue Law")+ylab("Violent Crime Rate")
 
 ```
 
-It seems plausible given the data that prior to 1985 lenient gun control policies are corrilated with lower rates of violent crimes.  However, let's look at the states that that have these policies. [look at income and crime rates!!]
+It seems plausible that the increase in gun leniency in 1990s was based on the increase in violent crime and the fact that  data  prior to 1985 lenient gun control policies are corrilated with lower rates of violent crimes.  
 
-If more relaxed laws on concealed carry decrease the violent crimes in a state we expect to that there would be decreased crime in states that adapt the concealed carry laws and that this decrease is not found in states that stringent laws over the course of the study.
+
+
+
+### Which states and regions adapted "shall issue" laws first and/or fastest?
+```{r}
+yes_law_region<-ddply(dat,.(year,region),summarize,easy_gun=length(which(law=="yes")))
+
+
+ggplot(yes_law_region,mapping=aes(x=year,y=easy_gun,group=region,color=region))+geom_step()+ggtitle("Rise in Shall Issue Laws by region")+xlab("Year")+ylab("Number of Shall Issue States")
+```
+Interestingly, the Northeast began with the most "shall issue" states but only saw modest growth over the course of the study whereas the South began with no "shall issue" laws and saw huge expansion during the nineties.  It would be interesting to see what was driving this growth in one part of the country that was absent in the others.  
 
 ```{r}
-laws_status<-function(x){
-  y<-length(unique(x))
-  if(y==2){
-    z="Switched"
-  }else if(y==1){
-    z="Same"
-  }
-}
-
-laws_status<- ddply(dat,~state,summarize,law_stability=laws_status(law))
-dat<-join(dat,laws_status,by='state',type='left')
+region_rates<-ddply(dat,.(year,region),summarize, rate=mean(violent))
 
 
+region_se<-ddply(dat,.(year,region),summarize, se=se(violent))
 
-ggplot(dat,mapping=aes(x=year,y=violent,color=law,group=state))+geom_line()+facet_wrap(~law_stability)
+region_crimes<-join(region_rates,region_se,by=c("year","region"),type="left")
+limits<-aes(ymax=rate+se,ymin=rate-se)
+ggplot(region_crimes,mapping=aes(x=year,y=rate,group=region,color=region)) + geom_line()+geom_errorbar(limits)+facet_wrap(~region)+ggtitle("Violent Crimes by Region")+xlab("Year")+ylab("Violent Crime Rate")
 ```
 
-It seems like there is decrease in violent crime rate in the states which adapted less stringent laws; however, by this rough estimation it seems like there is a similar rise and fall in states that did not adapt differing laws.  
 
-### What drives crime rates and does gun availability affect these rates
-So this impact of gun availablity on violent crime rates is still open.  There seems to be similar trends in violent crime rate ( as well as murder and robbery for that matter) in all states over time. And to thus far I have not found any other variables that have similar osilations.    
-
-```{r}
-
-ggplot(dat,mapping=aes(x=afam,y=violent,color=law))+geom_point()+facet_wrap(~region)
-ggplot(dat,mapping=aes(x=cauc,y=violent,color=law))+geom_point()+facet_wrap(~region)
-ggplot(dat,mapping=aes(x=male,y=violent,color=law))+geom_point()+facet_wrap(~region)
-ggplot(dat,mapping=aes(x=prisoners,y=violent,color=law))+geom_point()+facet_wrap(~region)
-
-
-
-```
+Intersetingly the South which saw the most growth in "shall issue" laws also saw the largest increase and decrease in violent crime rates.  All regions saw this increase in the nineties which leads me to think that it is independent of "shall issue" law status.  However, as I mentioned earlier it would be interesting to see if the beleif that "shall issue" laws decrease violent crimes lead to such a rise in the laws in response to increases in crime.  Perhaps the converse is true that the increase in crime was driven by the "shall issue" laws.  It would be interesting to read the original paper and get an idea as to what an indepth analysis of this data would reveal.  
 
 
 
