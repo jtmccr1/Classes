@@ -1,0 +1,67 @@
+---
+title: "Lab 6"
+author: "JT McCrone"
+date: "October 1, 2014"
+output: html_document
+---
+
+Load the data
+
+```{r}
+options(stringsAsFactors = FALSE)
+course.url <- "http://kinglab.eeb.lsa.umich.edu/480"
+urls <- paste0(course.url,"/data/",
+               c("Thrips_imaginis_Davidson1948.csv",
+                 "Parus_major_Wytham_Wood.csv"))
+dat <- lapply(urls,read.csv,comment.char="#")
+require(plyr)
+thrips <- mutate(dat[[1]],
+                 year=Sample.Date%/%1,
+                 month=round(100*(Sample.Date%%1)),
+                 time=year+month/12,
+                 pop=Population, Population=NULL, Sample.Date=NULL)
+parus <- rename(dat[[2]],c(Sample.Date="year",Population="pop"))
+rm(dat)
+
+```
+
+
+### Exercise 1
+
+```{r}
+require(ggplot2)
+t_p<-ggplot(thrips,mapping=aes(x=time,y=pop))+geom_line()+ggtitle("Thrip Population")+xlab("Year")+ylab("Mean population on rose/day")
+
+print(t_p)
+t_p+scale_y_log10()
+t_p+scale_y_sqrt()
+
+
+
+p_p<-ggplot(parus,mapping=aes(x=year,y=pop))+geom_line()+ggtitle("Parus Major population")+xlab("Year")+ylab("Census count")
+p_p+scale_y_log10()
+p_p+scale_y_sqrt()
+
+```
+
+### Exercise 2
+
+```{r}
+
+
+thrips<-rename(thrips,replace = c("pop" = "Nt"))
+
+parus<-rename(parus,replace = c("pop"="Nt"))
+
+thrips<-mutate(thrips,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(thrips)
+
+parus<-mutate(parus,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(parus)
+
+                                
+ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Equation 5")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")                            
+ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Equation 6") +ggtitle("Parus Major Equation 6")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")                                        
+ggplot(thrips,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Equation 5")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)") 
+
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Equation 6") +ggtitle("Thrips Equation 6")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  
+
+```
