@@ -58,10 +58,102 @@ thrips<-mutate(thrips,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(
 parus<-mutate(parus,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(parus)
 
                                 
-ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Equation 5")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")                            
-ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Equation 6") +ggtitle("Parus Major Equation 6")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")                                        
-ggplot(thrips,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Equation 5")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)") 
+ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")                            
+ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Gompertz") +ggtitle("Parus Major Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")                                        
 
-ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Equation 6") +ggtitle("Thrips Equation 6")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  
+ggplot(thrips,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)") 
+
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Gompertz") +ggtitle("Thrips Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  
 
 ```
+
+
+
+
+### Exercise 3
+
+
+```{r}
+#Ricker
+Ricker.p<-lm(data=parus,log.Nt.Nt_1~Nt_1)
+summary(Ricker.p)
+
+
+r.p<-coef(Ricker.p)[1]; print(r.p)
+
+k.R.p<- -r.p/coef(Ricker.p)[2]; k.R.p 
+```
+$
+K=\frac{-r}{A}
+$
+```{r}
+#Gompertz
+Gomp.p<-lm(data=parus,log.Nt.Nt_1~log.Nt_1)
+summary(Gomp.p)
+
+alpha.p<- -coef(Gomp.p)[2] ; alpha.p
+
+K.G.p<-exp(coef(Gomp.p)[1]/alpha.p); K.G.p
+
+```
+
+
+###Exercise 4 
+```{r}
+#Ricker
+Ricker.t<-lm(data=thrips,log.Nt.Nt_1~Nt_1)
+summary(Ricker.t)
+
+
+r.t<-coef(Ricker.t)[1]; print(r.t)
+
+k.R.t<- -r.t/coef(Ricker.t)[2]; k.R.t
+```
+$
+K=\frac{-r}{A}
+$
+```{r}
+#Gompertz
+Gomp.t<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1)
+summary(Gomp.t)
+
+alpha.t<- -coef(Gomp.t)[2] ; alpha.t
+
+K.G.t<-exp(coef(Gomp.p)[1]/alpha.t); K.G.t
+
+```
+
+
+
+
+
+
+### Exercise 5 
+```{r}
+
+parus<-mutate(parus,Gomp=c(NA,fitted(Gomp.p)),Ricker=c(NA,fitted(Ricker.p)))
+thrips<-mutate(thrips,Gomp=c(NA,fitted(Gomp.t)),Ricker=c(NA,fitted(Ricker.t)))
+
+
+ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")+geom_line(mapping=aes(x=Nt_1,y=Ricker))
+
+
+ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Gompertz") +ggtitle("Parus Major Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")+geom_line(mapping=aes(x=log.Nt_1,y=Gomp))                                        
+
+ggplot(thrips,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)") +geom_line(mapping=aes(x=Nt_1,y=Ricker))
+
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Gompertz") +ggtitle("Thrips Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  +geom_line(mapping=aes(x=log.Nt_1,y=Gomp))
+```
+
+### Exercise 6
+
+
+```
+
+
+
+
+
+
+
+
