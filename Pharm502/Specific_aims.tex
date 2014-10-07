@@ -1,0 +1,38 @@
+% XeLaTeX can use any Mac OS X font. See the setromanfont command below.
+% Input to XeLaTeX is full Unicode, so Unicode characters can be typed directly into the source.
+
+% The next lines tell TeXShop to typeset with xelatex, and to open and save the source with Unicode encoding.
+
+%!TEX TS-program = xelatex
+%!TEX encoding = UTF-8 Unicode
+
+\documentclass[11pt]{article}
+%\usepackage{geometry}  
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+
+              % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{cite}
+% Will Robertson's fontspec.sty can be used to simplify font choices.
+% To experiment, open /Applications/Font Book to examine the fonts provided on Mac OS X,
+% and change "Hoefler Text" to any of these choices.
+
+\usepackage{fontspec,xltxtra,xunicode}
+\defaultfontfeatures{Mapping=tex-text}
+
+\setmainfont{Arial}
+%\date{}                                           % Activate to display a given date or no date
+
+\begin{document}
+
+here is a test. \cite{Saphire:2013dw}
+
+
+\bibliographystyle{plain}
+\bibliography{/Users/jt/Documents/Classes/Pharm502/bib10.6.14.bib}{
+
+\end{document}  
