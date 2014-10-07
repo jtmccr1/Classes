@@ -55,8 +55,11 @@ parus<-rename(parus,replace = c("pop"="Nt"))
 
 thrips<-mutate(thrips,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(thrips)
 
-parus<-mutate(parus,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(parus)
+# Remove the first line as it contains NA's and is not used in the model
 
+thrips<-tail(thrips, -1)
+parus<-mutate(parus,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(parus)
+parus<-tail(parus,-1)
                                 
 ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")                            
 ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Gompertz") +ggtitle("Parus Major Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")                                        
@@ -83,9 +86,7 @@ r.p<-coef(Ricker.p)[1]; print(r.p)
 
 k.R.p<- -r.p/coef(Ricker.p)[2]; k.R.p 
 ```
-$
-K=\frac{-r}{A}
-$
+
 ```{r}
 #Gompertz
 Gomp.p<-lm(data=parus,log.Nt.Nt_1~log.Nt_1)
@@ -109,9 +110,7 @@ r.t<-coef(Ricker.t)[1]; print(r.t)
 
 k.R.t<- -r.t/coef(Ricker.t)[2]; k.R.t
 ```
-$
-K=\frac{-r}{A}
-$
+
 ```{r}
 #Gompertz
 Gomp.t<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1)
@@ -146,14 +145,122 @@ ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrip
 ```
 
 ### Exercise 6
+I may need to make a more basic model and then make the comparision to get the other pvalue from the F test
 
 
+```{r}
+Ricker.p.1<-lm(log.Nt.Nt_1~1,data=parus)
+anova(Ricker.p,Ricker.p.1)
+
+```
+I can see the F statistic given by the Anova comparision matches the p-value of the Nt_1 coefficient, but I'm not sure how to get a comparision for the intercept.
+
+###Exercise 7
+
+```{r}
+
+AIC(Ricker.p,Gomp.p)
+```
+The AIC suggests that the Gompertz model is a better fit for the Parus data.  The $R^2$ and the adjust $R^2$ also indicate the Gompertz model fits the data.
+### Exercise 8
+
+Now let's compare the how the models fit the thrips data.
+```{r}
+
+AIC(Ricker.t,Gomp.t)
 ```
 
 
+In looking at the thrips data plotted above it seems reasonable to conclude that time of yeader or climate may play a role in the population levels.  I will consider two models that try to incorporate this aspect.  Both of these models will include parameters that adjust the poputlation size based on the month of the year.  Since the Gompertz model fits this data the best thus far I'll use that as my starting point.  In my first model I'll add a term to modify population in as a function of both density and month of the year.  In the second model I'll look to see if month effects vary with population density.  
+
+```{r}
+months.ad<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1+month)
+summary(months.ad)
+
+months.inter<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1*month)
+summary(months.inter)
+AIC(Ricker.t,Gomp.t,months.ad,months.inter)
+```
+From the goodness of fit comparision given by the AIC above it seems the model based on the Gompertz population density model with the added imformtation given by including the month of the year gives the best model.  Based on the AIC and the adjusted $R^2$ values no useful information was added to the model by including a month-population interaction.
 
 
 
 
+### Exercise 9
+
+```{r}
+plot(Gomp.p)
+require(lmtest)
+```
+A) Heteroskedasticity - The Breusch-Pagan test regects the null hypothesis that the residues are not dependent on the log(Nt_1).  This is evidence for heteroskedasitcity.
+```{r}
+bptest(Gomp.p)
+
+```
+B)Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
+```{r}
+shapiro.test(residuals(Gomp.p))
+```
+C)Inlfuential points -  From the Residuals vs. Leverage plot above it doesn't seem like there are points in particular at are driving the fit, although 24 and 22 seem to be more influential than most.
+D) Autocorrelation in the residuals - There seems to be autocorrelation present which is not suprising given the observed correlation between the population and time seen above.
+```{r}
+dwtest(Gomp.p)
+
+```
+
+E) The parameter estimations of rate of growth r is 0.936.  I'm not sure of the units on the rates, but it is interesting that the rate is less than one.  I think this suggests that the population under no other influences the population would be decreasing which seems biologically unlikely as it would lead to extinction.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
+
+### Exercise 10
+
+```{r}
+plot(months.ad)
+require(lmtest)
+```
+A) Heteroskedasticity - The Breusch-Pagan test fails to regect the null hypothesis at a p-value cut off of 0.05. Suggesting that the residues are not dependent on model variables which is evidence for homoskedasitcity.
+```{r}
+bptest(months.ad)
+
+```
+B)Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
+```{r}
+shapiro.test(residuals(months.ad))
+```
+C)Inlfuential points -  From the Residuals vs. Leverage plot above it doesn't seem like there are points in particular at are driving the fit, although 68,80,and 81 seem to be more influential than most.
+D) Autocorrelation in the residuals - There seems to be autocorrelation present which is not suprising given the observed correlation between the population and time seen above. Although I don't know the implications this test has since I tried to model the time aspect of the data in this model.
+```{r}
+dwtest(months.ad)
+
+```
+
+### Adjust comments to thrips
+E) The parameter estimations of rate of growth r is 0.936.  I'm not sure of the units on the rates, but it is interesting that the rate is less than one.  I think this suggests that the population under no other influences the population would be decreasing which seems biologically unlikely as it would lead to extinction.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
+
+### Fitting the thrips data
+
+For this data analysis I am using my Gompertz model based model that includes monthly dynamics.
+
+Here is the first half of the data used to train the model.
+
+```{r}
+thrips_first_half<-subset(thrips,year<=1935)
+months.ad.trained<-months.ad<-lm(data=thrips_first_half,log.Nt.Nt_1~log.Nt_1+month)
+
+mutate(thrips,trained_prediction=predict(months.ad.trained,newdata=thrips),out.of.fit=(year>1935))->thrips
+
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Gompertz") +ggtitle("Thrips Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  +geom_line(mapping=aes(x=log.Nt_1,y=trained_prediction))+facet_grid(~out.of.fit,labeller=label_both)
+
+```
+It is difficult to see how well this model fits the new data because there is a temporal ascpect to the data and model that is underlying the plots but not apparent in the 2D plot.
+
+```{r}
+
+ddply(thrips,~out.of.fit,summarize,R2=1-sum((log.Nt.Nt_1-trained_prediction)^2)/sum((log.Nt.Nt_1-mean(log.Nt.Nt_1))^2))
+```
+It seems the model fits the test data better than it does the training data set which is not what I expected.  Maybe the model fits better becuase the testing data set stops at in the mid of an oscilation and perhaps the model has difficulty following these large population shifts.  But that's just an idea.
 
 
+
+
+### Exercise 12
+
+In order for our data to fit we assume there is an indepence of noise in the data.  If I understand my analysis above it seems like this assumption fails on the part of the Parus model, but not in the case of the thrips model that takes time into affect.  It could be that the noise in the parus model is dependent on the data because the population ossilates with the seasons.  The model of population density dependence may be more accurate during some parts of the year perhaps those not prone to large swings in population, but less accurate during such ossilations leading to residuals whose size is dependent on the population size because this is an indicator of seasonal swings.  We could correct this seasonal bias by splitting the data set and estimating different seasons separately.  Maybe with seasons the noise would be indepent of sampling time.  Also, but I'm not sure, could we include a time aspect in the model as I did in the months.ad model for thrips or am I getting too hung up on a p value less than 0.05 and possibly miss interpreting the result?
