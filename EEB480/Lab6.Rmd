@@ -5,8 +5,9 @@ date: "October 1, 2014"
 output: html_document
 ---
 
-Load the data
+Before diving into this analysis I'd like to note that I in general I understand the processes involved in modeling these populations; however we start comparing the model with the anova generated statistics I start to get a little hazzy.  I also think I could use some feedback on my comments regarding the biological interpretations of the statistics and the validity of our assumptions.  I look forward to making adjustments to this assingment as my understanding of the material improves.
 
+We'll start by loading the data.
 ```{r}
 options(stringsAsFactors = FALSE)
 course.url <- "http://kinglab.eeb.lsa.umich.edu/480"
@@ -27,24 +28,27 @@ rm(dat)
 
 
 ### Exercise 1
-
+We'll start by looking at changes in these populations over time using various scales to plot the population data.
 ```{r}
 require(ggplot2)
 t_p<-ggplot(thrips,mapping=aes(x=time,y=pop))+geom_line()+ggtitle("Thrip Population")+xlab("Year")+ylab("Mean population on rose/day")
 
 print(t_p)
-t_p+scale_y_log10()
-t_p+scale_y_sqrt()
+t_p+scale_y_log10()+ylab("Mean population on rose/day ( Log scale) ") # somemtimes this is the wrong plot.  I don't know way
+
+t_p+scale_y_sqrt()+ylab("Mean population on rose/day ( Square-root scale) ")
 
 
 
 p_p<-ggplot(parus,mapping=aes(x=year,y=pop))+geom_line()+ggtitle("Parus Major population")+xlab("Year")+ylab("Census count")
-p_p+scale_y_log10()
-p_p+scale_y_sqrt()
+p_p+scale_y_log10()+ylab("Census count ( Log scale)")
+p_p+scale_y_sqrt()+ylab("Census count ( Square-root scale)")
 
 ```
 
 ### Exercise 2
+Now we'll add the variables we need for the LM models and rename our data set to match the variables in equations 5 and 6.
+
 
 ```{r}
 
@@ -55,11 +59,25 @@ parus<-rename(parus,replace = c("pop"="Nt"))
 
 thrips<-mutate(thrips,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(thrips)
 
-# Remove the first line as it contains NA's and is not used in the model
 
-thrips<-tail(thrips, -1)
+```
+Now we'll plot the data according to the model equations.
+
+Ricker
+$$
+\text{log}\frac{N_t}{N_{t-1}} = r + AN_{t-1} + \epsilon _t
+$$ 
+where $A=-\frac{r}{K}$  
+
+Gompertz
+
+$$
+\text{log}\frac{N_t}{N_{t-1}} = B + C\text{log}N_{t-1} + \epsilon _t
+$$
+where $B=\alpha \text{log}K $ and $ C= - \alpha$
+
+```{r}
 parus<-mutate(parus,Nt_1=c(NA,head(Nt,-1)),log.Nt_1=log(Nt_1),log.Nt.Nt_1=log(Nt/Nt_1));head(parus)
-parus<-tail(parus,-1)
                                 
 ggplot(parus,mapping=aes(x=Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Ricker")+xlab("Nt_1")+ylab("Log(Nt/Nt_1)")                            
 ggplot(parus,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Parus Major Gompertz") +ggtitle("Parus Major Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")                                        
@@ -75,7 +93,7 @@ ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrip
 
 ### Exercise 3
 
-
+Now we'll fit the models above to the data.  First let's look at the Parus data.
 ```{r}
 #Ricker
 Ricker.p<-lm(data=parus,log.Nt.Nt_1~Nt_1)
@@ -98,8 +116,10 @@ K.G.p<-exp(coef(Gomp.p)[1]/alpha.p); K.G.p
 
 ```
 
+These models give slightly different estimates for carrying capacity but in all likelihood I think biologically they are very similary.  By these models it seems the carrying capacity is around 200 birds and the growth rate is slightly less than one.  I first I thought the growth rate would imply negative growth, but after looking at the equations I don't think that is the case. I don't know much about bird ecology but 200 birds as a carrying capacity seems quite small.
 
 ###Exercise 4 
+Now we'll look at the thrips data set.
 ```{r}
 #Ricker
 Ricker.t<-lm(data=thrips,log.Nt.Nt_1~Nt_1)
@@ -121,13 +141,15 @@ alpha.t<- -coef(Gomp.t)[2] ; alpha.t
 K.G.t<-exp(coef(Gomp.p)[1]/alpha.t); K.G.t
 
 ```
-
+If I don't know much about birds I know even less about thrips but it seems that the two models give biologically similar results.   A carrying capacity around 44 seems reasonable for insects on a leaf as it should be a maximum.
 
 
 
 
 
 ### Exercise 5 
+
+Now we'll take a look at how these models fit the data.
 ```{r}
 
 parus<-mutate(parus,Gomp=c(NA,fitted(Gomp.p)),Ricker=c(NA,fitted(Ricker.p)))
@@ -145,7 +167,7 @@ ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrip
 ```
 
 ### Exercise 6
-I may need to make a more basic model and then make the comparision to get the other pvalue from the F test
+Now we'll look at how the p-values associeated with the t-tests in the models compare to the an F-tests in anova.  This is where my understanding is a little fuzzy.
 
 
 ```{r}
@@ -153,7 +175,7 @@ Ricker.p.1<-lm(log.Nt.Nt_1~1,data=parus)
 anova(Ricker.p,Ricker.p.1)
 
 ```
-I can see the F statistic given by the Anova comparision matches the p-value of the Nt_1 coefficient, but I'm not sure how to get a comparision for the intercept.
+I can see the F statistic given by the Anova comparision matches the p-value of the Nt_1 coefficient, but I'm not sure how to get a comparision for the intercept.  Also I'm not sure what the relationship between the confidence intervals and the p-value would be.  If we collected this data 100 times and ran the anaylsis we would expect 95 times the true paratemer would be in the confidence interval, and the small the p-value I would expect the tighter the confidence interval.  Although I don't understand how to express the exact relationship or if this answers the question.
 
 ###Exercise 7
 
@@ -170,8 +192,9 @@ Now let's compare the how the models fit the thrips data.
 AIC(Ricker.t,Gomp.t)
 ```
 
+Again the AIC and the  $R^2$ and the adjust $R^2$ suggest the Gompertz model fits the data.
 
-In looking at the thrips data plotted above it seems reasonable to conclude that time of yeader or climate may play a role in the population levels.  I will consider two models that try to incorporate this aspect.  Both of these models will include parameters that adjust the poputlation size based on the month of the year.  Since the Gompertz model fits this data the best thus far I'll use that as my starting point.  In my first model I'll add a term to modify population in as a function of both density and month of the year.  In the second model I'll look to see if month effects vary with population density.  
+In looking at the thrips data plotted above it seems reasonable to conclude that time of year or climate may play a role in the population levels.  I will consider two models that try to incorporate this aspect.  Both of these models will include parameters that adjust the poputlation size based on the month of the year.  Since the Gompertz model fits this data the best thus far I'll use that as my starting point.  In my first model I'll add a term to modify population based on the month of the year.  In the second model I'll look to see if month effects vary with population density.  
 
 ```{r}
 months.ad<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1+month)
@@ -181,13 +204,15 @@ months.inter<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1*month)
 summary(months.inter)
 AIC(Ricker.t,Gomp.t,months.ad,months.inter)
 ```
-From the goodness of fit comparision given by the AIC above it seems the model based on the Gompertz population density model with the added imformtation given by including the month of the year gives the best model.  Based on the AIC and the adjusted $R^2$ values no useful information was added to the model by including a month-population interaction.
+From the goodness of fit comparision given by the AIC above it seems the model based on the Gompertz population density model with the added imformtation given by including the month of the year gives the best model.  Based on the AIC and the adjusted $R^2$ values no useful information was added to the model by including a month-population interaction.  Based on my understanding of the model above this is the equation I expect respresents the month.ad model.
 
-
-
+$$
+\text{log}\frac{N_t}{N_{t-1}} = B + C\text{log}N_{t-1} + \beta M + \epsilon _t
+$$
+where $M$ is the month of the year.
 
 ### Exercise 9
-
+Now we'll look to see if the assumptions of the models were met in our analysis, begining with the Parus data and Gompertz model
 ```{r}
 plot(Gomp.p)
 require(lmtest)
@@ -208,10 +233,10 @@ dwtest(Gomp.p)
 
 ```
 
-E) The parameter estimations of rate of growth r is 0.936.  I'm not sure of the units on the rates, but it is interesting that the rate is less than one.  I think this suggests that the population under no other influences the population would be decreasing which seems biologically unlikely as it would lead to extinction.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
+E) The parameter estimations of rate of growth r is 0.936.  This seems reasonable.  I first thought it would result in a negative growth, but looking at the equations I can see that that is not the case.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
 
 ### Exercise 10
-
+For the Thrips data I'll be using my Gompertz and month model.  Am I interpretting these tests correctly?
 ```{r}
 plot(months.ad)
 require(lmtest)
@@ -221,7 +246,7 @@ A) Heteroskedasticity - The Breusch-Pagan test fails to regect the null hypothes
 bptest(months.ad)
 
 ```
-B)Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
+B) Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
 ```{r}
 shapiro.test(residuals(months.ad))
 ```
@@ -233,7 +258,7 @@ dwtest(months.ad)
 ```
 
 ### Adjust comments to thrips
-E) The parameter estimations of rate of growth r is 0.936.  I'm not sure of the units on the rates, but it is interesting that the rate is less than one.  I think this suggests that the population under no other influences the population would be decreasing which seems biologically unlikely as it would lead to extinction.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
+E) The parameter estimations seem valid.  The growth rate is positive and so is the month parameter which suggest the population grows throughout the year.  It may have been better to model seasons as in my model the weather around November and December (11 and 12) is similar to January (1) and this is difficult to grasp in how my model is set up.
 
 ### Fitting the thrips data
 
@@ -263,4 +288,4 @@ It seems the model fits the test data better than it does the training data set 
 
 ### Exercise 12
 
-In order for our data to fit we assume there is an indepence of noise in the data.  If I understand my analysis above it seems like this assumption fails on the part of the Parus model, but not in the case of the thrips model that takes time into affect.  It could be that the noise in the parus model is dependent on the data because the population ossilates with the seasons.  The model of population density dependence may be more accurate during some parts of the year perhaps those not prone to large swings in population, but less accurate during such ossilations leading to residuals whose size is dependent on the population size because this is an indicator of seasonal swings.  We could correct this seasonal bias by splitting the data set and estimating different seasons separately.  Maybe with seasons the noise would be indepent of sampling time.  Also, but I'm not sure, could we include a time aspect in the model as I did in the months.ad model for thrips or am I getting too hung up on a p value less than 0.05 and possibly miss interpreting the result?
+In order for our data to fit we assume there is an indepence of noise in the data.  If I understand my analysis above it seems like this assumption fails on the part of the Parus model, but not in the case of the thrips model that takes time into affect.  It could be that the noise in the parus model is dependent on the data because the population ossilates with the seasons.  The model of population density dependence may be more accurate during some parts of the year, perhaps those not prone to large swings in population, but less accurate during such ossilations leading to residuals whose size is dependent on these seasonal swings.  We could correct this seasonal bias by splitting the data set and estimating different seasons separately.  Maybe with seasons the noise would be indepent of sampling time.  Also, but I'm not sure, could we include a time aspect in the model as I did in the months.ad model for thrips or am I getting too hung up on a p value less than 0.05 and possibly miss interpreting the result?

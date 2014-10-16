@@ -1,0 +1,113 @@
+---
+title: "The general linear model"
+author: "JT McCrone"
+date: "September 29, 2014"
+output: html_document
+---
+
+### What are LM?
+* Linear Regression*  
+$y_1,y_2,...,y_n$ - response  
+$x_1,x_2,,...,x_n$ - predictor
+This gives us the following regression where $\epsilon$ is the noise or error at the $i^{th}$ observation
+$$ y_i = ax_i+\epsilon$$
+
+
+* Multiple Linear Regression*
+With multiple predictors we get
+
+$$ y_i = a_1x_{i1}+a_2x_{i2}+...+a_mx_{im}+\epsilon_i$$
+
+
+*ANOVA*
+
+For each individual we have an observation, but also a group. Let individual $i$ belong to group $g(i)$.  
+$$y_i=a_{g(i)}+\epsilon_i$$
+
+We can understand $y$ by knowing what group $y$ belongs to.
+
+
+*Common Form*
+
+$$y_i = \sum\limits_{j=1}^m x_{ij}a_j + \epsilon_i$$
+
+*Matrix representaion*  
+$$ y = X\beta + \epsilon   \epsilon \sim N(0,\sigma I)$$
+$$ y \sim N(X\beta,\sigma I)$$
+
+Note that $\epsilon$ is normally distributed.
+
+$$ y = \begin{matrix}
+y_1\\
+y_2\\
+\vdots\\
+y_n\end{matrix}$$
+
+$$X= \begin{matrix} 
+x_{11} & x_{12} & \ldots & x_{1m} \\
+x_{21} &x_{22} & \ldots & \vdots \\
+\vdots & \vdots & \ddots & \vdots \\
+x_{n1} & \ldots & \ldots & x_{nm}\\
+\end{matrix}$$
+
+$$\beta= \begin{matrix}
+\beta_1\\
+\beta_2\\
+\vdots\\
+\beta_n\end{matrix}$$  
+*Wilkinson-Rogers notation*  
+
+$$y \sim a+b+c$$
+$$
+X= \begin{matrix}
+\vdots &  \vdots  & \vdots \\
+a  &  b & c \\
+\vdots &  \vdots  & \vdots\\
+\end{matrix}
+$$
+*Generalized linear model (LM)*
+
+The response variable $y$ satisfies $y=X\beta +\epsilon$ where $\epsilon \sim N(0,\sigma I)$ where $I$ is the identigy matrix.  In other words $$Y \sim N(X\beta,\sigma I)$$.
+
+
+
+### Estimation for LM
+
+$$SS=\sum\limits_{i=1}^n \epsilon_i^2 = \sum\limits_{i=1}^n(y_i-(X\beta)_i)^2= \sum\limits_{i=1}^n(y_i-\sum\limits_{j=1}^nX_{ij}\beta_j)^2$$
+To find the limit we take the derivitive
+
+$$ \frac{\delta SS}{\delta\beta_k} = \sum\limits_{i=1}^n 2 (y_i-\sum\limits_{j=1}^nX_{ij}\beta_j)(\sum\limits_{j=1}^n x_{ij}\frac{\delta\beta_j}{\beta_i})$$ This needs to be checked
+
+*Normal equation* This is where SS is minimalized
+$$X^TX\beta = X^Ty$$
+
+$y \mapsto \hat{\beta}$
+$$\hat{\beta}=(X^TX)^{-1}X^Ty$$
+
+$\hat{y}$ is the predicted or fitted values
+
+$$\hat{y}= X\hat{\beta}=X(X^TX)^{-1}X^Ty$$
+where $X(X^TX)^{-1}X^T$ is the hat matrix $H$.
+*residuals* $\hat{\epsilon} = \hat{y}-y$
+$$\hat{epsilon}=(I-H)y  $$
+
+### Modern Perspective on estimation
+*A central concept : The likelyhood function*
+$$\mathscr{L} = \mathbf{P}[\text{data|model}]$$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

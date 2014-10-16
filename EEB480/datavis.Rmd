@@ -1,0 +1,98 @@
+---
+title: "Visualizing data with ggplot2"
+author: "Aaron A. King"
+date: "09/21/2014"
+output: html_document
+---
+
+In this document, we'll practice visualizing data using *ggplot2*.
+
+### Loading packages and data
+
+First, we'll load some packages.
+If the following generates an error, you may need to install these packages.
+
+```{r}
+require(ggplot2)
+require(plyr)
+require(reshape2)
+```
+
+Now, we'll load some data.
+```{r,load-data,cache=TRUE}
+course.url <- "http://kinglab.eeb.lsa.umich.edu/480"
+datafile <- paste(course.url,"data/seedpred.csv",sep='/')
+dat <- read.csv(datafile,comment.char="#",
+                colClasses=c(species='factor',dist='factor',date="Date"))
+sapply(dat,class)
+head(dat)
+```
+Note, it was useful to me to first run `file.show()` on the data file, to read the comments there.
+These are just the raw data from the seed-predation component of the study by [Duncan and Duncan (2000)](http://dx.doi.org/10.1111/j.1744-7429.2000.tb00445.x).
+
+### Examining the data.
+
+Number of species, stations, and distances;
+also, number of distances per station, species per station, and stations per species/distance pair:
+```{r,summaries}
+summarize(dat,
+          nspp=length(unique(species)),
+          nsta=length(unique(station)),
+          ndist=length(unique(dist))
+          )
+ddply(dat,~station,summarize,nspp=length(unique(species)),ndist=length(unique(dist)))
+daply(dat,~species+dist,summarize,nsta=length(unique(station)))
+```
+
+
+Let us plot some typical replicates.  
+```{r, replicates}
+x <- subset(dat,station==17 & dist==10)
+ggplot(data=x,mapping=aes(x=date,y=seeds))+geom_point()+geom_step()
+ggplot(data=subset(dat,station==17),mapping=aes(x=date,y=seeds,group=dist,color=dist))+geom_point()+geom_step()
+ggplot(data=subset(dat,station %in% 1:4),mapping=aes(x=date,y=seeds,group=dist,color=dist))+
+  geom_point()+geom_step()+facet_wrap(~station)
+```
+
+### Estimating rates
+
+Extracting time to removal of all seeds.
+First, exclude replicates for which either no seeds were laid out or not all seeds were taken:
+```{r}
+ddply(dat,~station+dist+species,subset,max(seeds)>0 & min(seeds)==0) -> dat1
+```
+Now, we want to consider that the time after there were no seeds present contributes no information about the seed predation process.
+So, we should eliminate those observations:
+```{r}
+ddply(dat1,~station+dist+species,mutate,avail=c(NA,head(seeds,-1))) -> dat1
+ddply(dat1,~station+dist+species,subset,is.na(avail) | avail>0) -> dat2
+```
+
+Now, we want to know how many seeds were taken at each station/dist/species combination and how long it took:
+```{r,rates}
+ddply(dat2,~station+dist+species,summarize,
+      max(seeds),
+      min(seeds),
+      taken=max(seeds)-min(seeds),
+      time=diff(range(date)),
+      rate=taken/as.numeric(time)
+      ) -> dat2
+head(dat2)
+```
+Note that the units of the `rate` variable are seeds/day. 
+Now we can summarize these rates across replicates:
+```{r}
+ddply(dat2,~species+dist,summarize,
+      meanRate=mean(rate),
+      sdRate=sd(rate),
+      semRate=sdRate/sqrt(length(rate))
+      )
+```
+Alternatively,
+```{r}
+daply(dat2,~species+dist,summarize,
+      meanRate=mean(rate),
+      sdRate=sd(rate),
+      semRate=sdRate/sqrt(length(rate))
+      )
+```
