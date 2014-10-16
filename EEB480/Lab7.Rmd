@@ -1,0 +1,71 @@
+---
+title: "Lab7"
+author: "JT McCrone"
+date: "October 8, 2014"
+output: html_document
+---
+
+### Exercise 1 
+First I'll set up the close model with time steps in years and then change to days for comparision.
+```{r}
+require(deSolve)
+require(ggplot2)
+require(reshape2)
+
+closed.sir.model <- function (t, x, params) { 
+infect <- params["beta"]*x[1]*x[2]/sum(x)
+recover <- params["gamma"]*x[2]
+list(c(-infect,infect-recover,recover))
+}
+
+
+
+params <- c(beta=400,gamma=365/13)
+times<-seq(0,60/365,1/365/4)
+xstart <- c(S=999,I=1,R=0)
+
+out <- as.data.frame(
+                     ode(
+                         func=closed.sir.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+
+out2 <- melt(out,id='time') 
+ggplot(data=out2,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')
+
+```
+
+
+Changing the units to days we should get the same curves, just with an x axis with a different scale.  This is because we aren't acutally changing any rates, we are just scaling their units and then observing the outcomes on this new scale.
+```{r}
+params<-params/365
+times<-times*365
+
+out <- as.data.frame(
+                     ode(
+                         func=closed.sir.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+
+out2 <- melt(out,id='time') 
+ggplot(data=out2,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (days)',y='number of individuals')
+
+
+```
+### Exercise 2
+
+```{r}
+closed.sir.model <- function (t, x, params) { 
+infect <- params["beta"]*x[1]*x[2]/sum(x)
+recover <- params["gamma"]*x[2]
+list(c(-infect,infect-recover,recover))
+}
+
+
+```
