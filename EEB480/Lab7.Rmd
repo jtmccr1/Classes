@@ -57,7 +57,7 @@ out <- as.data.frame(
 out_long2 <- melt(out,id='time') 
 ggplot(data=out_long2,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (days)',y='number of individuals')
 
-out_long==out_long2
+identical(out_long["value"],out_long2["value"])
 ```
 The results are not exactly equal, however, probably due to slight inaccuracies based on the numerical solver.
 ### Exercise 2
@@ -112,32 +112,35 @@ It seems like so long as $R_0$ is greater than 1 there will a sustained level of
 ###Exercise 3
 
 ```{r}
-open.seir.model <- function (t, x, params) {
-  born<-params["B"]
-  infec <- params["beta"]*x[1]*x[3]/sum(x) 
-  symp <- params["sigma"]*x[2]
-  recov <- params["gamma"]*x[3] 
-  death<-x*params["mu"]
-  list(c(-infec+born-death[1],infec-symp-death[2],symp-recov-death[3],recov-death[4]))
-  }
-
-open.sir.model <- function (t, x, params) { 
+open.seir.model <- function (t, x, params) { 
 born<-params["B"]
-infect <- params["beta"]*x[1]*x[2]/sum(x)
-recover <- params["gamma"]*x[2]
+infect <- params["beta"]*x[1]*x[3]/sum(x)
+symp<-params["sigma"]*x[2]
+recover <- params["gamma"]*x[3]
 death<-x*params["mu"]
-list(c(-infect+born-death[1],infect-recover-death[2],recover-death[3])) # This needs to be 4
+
+list(c(-infect+born-death[1],infect-symp-death[2],symp-recover-death[3],recover-death[4])) 
 }
 
 
-xstart <- c(S=999,I=1,R=0)
-xstart_sier<-c(S=999,I=1,E=0,R=0)
-params <- c(B=2E4,mu=1/50,beta=1000,gamma=365/5)
+
+open.sir.model <- function (t, x, params) { 
+born<-params["B"]
+infect <- params["beta"]*x[1]*x[3]/sum(x)
+recover <- params["gamma"]*x[3]
+death<-x*params["mu"]
+symp<-0
+list(c(-infect+born-death[1],symp,infect-recover-death[3],recover-death[4])) 
+}
+
+
+xstart <- c(S=999,E=0,I=1,R=0)
+params <- c(B=2E4,mu=1/50,beta=1000,gamma=365/5,sigma=365/8)
 times <- seq(from=0,to=25,by=1/365)
 
 out_sir <- as.data.frame(
                      ode(
-                         func=closed.sir.model,
+                         func=open.sir.model,
                          y=xstart,
                          times=times,
                          parms=params
@@ -145,10 +148,10 @@ out_sir <- as.data.frame(
                      )
 
 
-out_sier <- as.data.frame(
+out_seir <- as.data.frame(
                      ode(
-                         func=closed.sir.model,
-                         y=xstart_sier,
+                         func=open.seir.model,
+                         y=xstart,
                          times=times,
                          parms=params
                         ) 
@@ -156,8 +159,22 @@ out_sier <- as.data.frame(
 
 out_sir <- melt(out_sir,id='time') 
 mutate(out_sir,Id="SIR")->out_sir
-out_sier<-melt(out_sier,id='time')
-mutate(out_sier,Id="SIER")
-out<-rbind(out_sir,out_sier)
-ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+facet_wrap(~Id)
+out_seir<-melt(out_seir,id='time')
+mutate(out_seir,Id="SEIR")->out_seir
+out<-rbind(out_sir,out_seir)
+ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()+facet_wrap(~Id)
+```
+It was my initial thought that this latent perior would slow the outbreak down, at least initially.  When we only look at the number of infected individuals it becomes clear that in the long run these out breaks have the same behavior.  However, during the intial number of people infected in the first wave of the outbreaks differs.  When there is a latent phase, the increase in the number of infected individuals is delayed and less dramitic.  This lag is also seen in the decrease of infected susceptible individuals and the slower rise in recovered individual
+
+```{r}
+
+ggplot(data=subset(out,time < 0.25 ),mapping=aes(x=time,y=value,color=variable,linetype=Id))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+facet_wrap(~variable)
+```
+###Exercise 4
+
+
+
+
+
+
 
