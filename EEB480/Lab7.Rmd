@@ -12,6 +12,9 @@ require(deSolve)
 require(ggplot2)
 require(reshape2)
 require(plyr)
+require(diagram)
+```
+```{r}
 
 closed.sir.model <- function (t, x, params) { 
 infect <- params["beta"]*x[1]*x[2]/sum(x)
@@ -110,7 +113,7 @@ gamma=slider(1,365,label="gamma",initial=365/13)
 It seems like so long as $R_0$ is greater than 1 there will a sustained level of infected individuals in the population , but when $R_0$ is less than 1 the outbreak decreases and the number of infected individuals decreases constantly, unitl the epidemic dies out.
 
 ###Exercise 3
-
+For the next two exercises I'm using a starting population of 1 million.  This should be the stready state for population allowing us to focus on the popualtion dynamics caused by the outbreak
 ```{r}
 open.seir.model <- function (t, x, params) { 
 born<-params["B"]
@@ -134,7 +137,7 @@ list(c(-infect+born-death[1],symp,infect-recover-death[3],recover-death[4]))
 }
 
 
-xstart <- c(S=999,E=0,I=1,R=0)
+xstart <- c(S=999999,E=0,I=1,R=0)
 params <- c(B=2E4,mu=1/50,beta=1000,gamma=365/5,sigma=365/8)
 times <- seq(from=0,to=25,by=1/365)
 
@@ -164,6 +167,7 @@ mutate(out_seir,Id="SEIR")->out_seir
 out<-rbind(out_sir,out_seir)
 ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()+facet_wrap(~Id)
 ```
+
 It was my initial thought that this latent perior would slow the outbreak down, at least initially.  When we only look at the number of infected individuals it becomes clear that in the long run these out breaks have the same behavior.  However, during the intial number of people infected in the first wave of the outbreaks differs.  When there is a latent phase, the increase in the number of infected individuals is delayed and less dramitic.  This lag is also seen in the decrease of infected susceptible individuals and the slower rise in recovered individual
 
 ```{r}
@@ -172,9 +176,105 @@ ggplot(data=subset(out,time < 0.25 ),mapping=aes(x=time,y=value,color=variable,l
 ```
 ###Exercise 4
 
+I'll make the assumption that the as soon as someone has recovevered, they are immune for ten years.  So the R compartment is the "immune" compartment and after ten years of immunity the inidividual will cycle back into the susceptible compartment.
+
+
+```{r,echo=F}
+par(mar=c(1,1,1,1))
+
+names<-c("S","I","R")
+M<-matrix(nrow = 3, ncol = 3, byrow = TRUE, data = 0)
+M[1,3]<-"delta"
+M[2,1]<-"sigma"
+M[3,2]<-"gamma"
+
+plotmat(M, pos = c(3), name = names, lwd = 1,
+         box.lwd = 2, cex.txt = 0.8, box.size = 0.1,
+        box.type = "square", box.prop = 0.5,curve = 0.2)
+
+```
+
+We'll compare the dynamics of the outbreak in the same way as we did above.
 
 
 
+```{r}
+open.sirs.model <- function (t, x, params) { 
+born<-params["B"]
+infect <- params["beta"]*x[1]*x[2]/sum(x)
+recover <- params["gamma"]*x[2]
+death<-x*params["mu"]
+sus<-params["delta"]*x[3]
+list(c(-infect+born-death[1]+sus,infect-recover-death[2],recover-death[3]-sus)) 
+}
 
 
+xstart <- c(S=999999,I=1,R=0)
+params <- c(B=2E4,mu=1/50,beta=1000,gamma=365/5,delta=1/10)
+times <- seq(from=0,to=25,by=1/365)
 
+out_sirs <- as.data.frame(
+                     ode(
+                         func=open.sirs.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+params["delta"]<-0 # To makethe model effectly an SIR model
+
+
+out_sir <- as.data.frame(
+                     ode(
+                         func=open.sirs.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+
+out_sir <- melt(out_sir,id='time') 
+mutate(out_sir,Id="SIR")->out_sir
+out_sirs<-melt(out_sirs,id='time')
+mutate(out_sirs,Id="SIRS")->out_sirs
+out<-rbind(out_sir,out_sirs) 
+
+ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()+facet_wrap(~Id)
+
+```
+
+We discussed in classes that the periodic behavior of the infection outbreaks was due to the fact that one outbreak drained the susceptible population until the birth rate built the number of susceptibles up again before another, smaller outbreak hit.  It looks like in the SIRS model the period and depth of these outbreaks is decreased.  This makes sense we are refilling the susceptible population faster.  Interstingly it looks like long-term behavior is splightly different. In the case were immunity is not eternal there is a highler level of infection once the model reaches the steady state.  I suppose this makes sense as in the SIRS we are replenishing the susceptible popualtion faster.
+
+```{r}
+times <- seq(from=0,to=100,by=1/365)
+params <- c(B=2E4,mu=1/50,beta=1000,gamma=365/5,delta=1/10)
+
+out_sirs <- as.data.frame(
+                     ode(
+                         func=open.sirs.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+
+params["delta"]<-0 # To makethe model effectly an SIR model
+
+
+out_sir <- as.data.frame(
+                     ode(
+                         func=open.sirs.model,
+                         y=xstart,
+                         times=times,
+                         parms=params
+                        ) 
+                     )
+
+out_sir <- melt(out_sir,id='time') 
+mutate(out_sir,Id="SIR")->out_sir
+out_sirs<-melt(out_sirs,id='time')
+mutate(out_sirs,Id="SIRS")->out_sirs
+out<-rbind(out_sir,out_sirs) 
+
+ggplot(data=subset(out,variable=="I"),mapping=aes(x=time,y=value,color=Id))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()
+```
