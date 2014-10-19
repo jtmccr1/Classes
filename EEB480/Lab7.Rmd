@@ -6,8 +6,8 @@ output: html_document
 ---
 
 ### Exercise 1 
-First I'll set up the close model with time steps in years and then change to days for comparision.
-```{r}
+First I'll set up the close model with time steps in years and then change to days for comparison.
+```{r,echo=FALSE}
 require(deSolve)
 require(ggplot2)
 require(reshape2)
@@ -43,7 +43,7 @@ ggplot(data=out_long,mapping=aes(x=time,y=value,color=variable))+geom_line(size=
 ```
 
 
-Changing the units to days we should get the same curves, just with an x axis with a different scale.  This is because we aren't acutally changing any rates, we are just scaling their units and then observing the outcomes on this new scale.
+Changing the units to days we should get the same curves, just with an x axis with a different scale.  This is because we aren't actually changing any rates, we are just scaling their units and then observing the outcomes on this new scale.
 ```{r}
 params<-params/365
 times<-times*365
@@ -62,7 +62,8 @@ ggplot(data=out_long2,mapping=aes(x=time,y=value,color=variable))+geom_line(size
 
 identical(out_long["value"],out_long2["value"])
 ```
-The results are not exactly equal, however, probably due to slight inaccuracies based on the numerical solver.
+The results are not exactly equal, however, probably due to slight inaccuracies based on the numerical solver.  
+
 ### Exercise 2
 
 ```{r, eval=FALSE}
@@ -113,7 +114,7 @@ gamma=slider(1,365,label="gamma",initial=365/13)
 It seems like so long as $R_0$ is greater than 1 there will a sustained level of infected individuals in the population , but when $R_0$ is less than 1 the outbreak decreases and the number of infected individuals decreases constantly, unitl the epidemic dies out.
 
 ###Exercise 3
-For the next two exercises I'm using a starting population of 1 million.  This should be the stready state for population allowing us to focus on the popualtion dynamics caused by the outbreak
+For the next two exercises I'm using a starting population of 1 million.  This should be the steady state for the population and will allow us to focus on the population dynamics caused by the outbreak.
 ```{r}
 open.seir.model <- function (t, x, params) { 
 born<-params["B"]
@@ -168,7 +169,7 @@ out<-rbind(out_sir,out_seir)
 ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()+facet_wrap(~Id)
 ```
 
-It was my initial thought that this latent perior would slow the outbreak down, at least initially.  When we only look at the number of infected individuals it becomes clear that in the long run these out breaks have the same behavior.  However, during the intial number of people infected in the first wave of the outbreaks differs.  When there is a latent phase, the increase in the number of infected individuals is delayed and less dramitic.  This lag is also seen in the decrease of infected susceptible individuals and the slower rise in recovered individual
+It was my initial thought that this latent period would slow the outbreak down, at least initially.  When we only look at the number of infected individuals it becomes clear that in the long run these out breaks have the same behavior.  However, during the initial number of people infected in the first wave of the outbreaks differs.  When there is a latent phase, the increase in the number of infected individuals is delayed and less dramatic.  This lag is also seen in the decrease of infected susceptible individuals and the slower rise in recovered individual.
 
 ```{r}
 
@@ -176,7 +177,7 @@ ggplot(data=subset(out,time < 0.25 ),mapping=aes(x=time,y=value,color=variable,l
 ```
 ###Exercise 4
 
-I'll make the assumption that the as soon as someone has recovevered, they are immune for ten years.  So the R compartment is the "immune" compartment and after ten years of immunity the inidividual will cycle back into the susceptible compartment.
+I'll make the assumption that the as soon as someone has recovered, they are immune for ten years.  So the R compartment is the "immune" compartment and after ten years of immunity the individual will cycle back into the susceptible compartment.
 
 
 ```{r,echo=F}
@@ -243,7 +244,7 @@ ggplot(data=out,mapping=aes(x=time,y=value,color=variable))+geom_line(size=2)+th
 
 ```
 
-We discussed in classes that the periodic behavior of the infection outbreaks was due to the fact that one outbreak drained the susceptible population until the birth rate built the number of susceptibles up again before another, smaller outbreak hit.  It looks like in the SIRS model the period and depth of these outbreaks is decreased.  This makes sense we are refilling the susceptible population faster.  Interstingly it looks like long-term behavior is splightly different. In the case were immunity is not eternal there is a highler level of infection once the model reaches the steady state.  I suppose this makes sense as in the SIRS we are replenishing the susceptible popualtion faster.
+We discussed in classes that the periodic behavior of the infection outbreaks was due to the fact that one outbreak drained the susceptible population until the birth rate built the number of susceptibles to a population that sustain another smaller outbreak.  It looks like in the SIRS model the period and depth of these outbreaks is decreased.  This makes sense we are refilling the susceptible population faster.  Interestingly it looks like long-term behavior is slightly different. In the case were immunity is not eternal there is a higher level of infection once the model reaches the steady state.  I suppose this makes sense as in the SIRS we are replenishing the susceptible population faster.
 
 ```{r}
 times <- seq(from=0,to=100,by=1/365)
@@ -278,3 +279,4 @@ out<-rbind(out_sir,out_sirs)
 
 ggplot(data=subset(out,variable=="I"),mapping=aes(x=time,y=value,color=Id))+geom_line(size=2)+theme_classic()+labs(x='time (yr)',y='number of individuals')+scale_y_log10()
 ```
+
