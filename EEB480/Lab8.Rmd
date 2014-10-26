@@ -1,0 +1,24 @@
+---
+title: "Lab8"
+author: "JT McCrone"
+date: "October 20, 2014"
+output: html_document
+---
+
+
+### Exercise 2
+```{r}
+labs<-200   # The number of labs
+N<-matrix(data=NA,nrow=200,ncol=labs)
+N[1,]<-rep(x=100,times=labs)     # We begin with 100 test tubes
+
+t<-1  # We set t =1 above
+while(any(N[t,]>0)){
+  t<-t+1
+N[t,]<-rbinom(n=labs,size=N[t-1,],prob=0.95)
+}
+
+
+matplot(N,type='l',lty=1)
+```
+### Exercise 13 
