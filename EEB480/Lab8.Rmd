@@ -7,12 +7,19 @@ output: html_document
 ```{r}
 require(ggplot2)
 require(plyr)
-
+require(emdbook)
+require(reshape2)
 
 
 ```
 
 ### Exercise 2
+
+This exercise is about determining the day of reckoning for a lab that has 100 test tubes that each break with the probability of 0.05% each day.  The day of reckoning is day that the lab runs out of test tubes completely, halting all potential for productive science ( assuming it only takes 1 test tube to explore what the lab studies) .
+
+First I modeled the number of available test tubes over time in 1E5 labs.
+
+
 ```{r}
 labs<-1E5  # The number of labs
 N<-matrix(data=0,nrow=400,ncol=labs)
@@ -26,45 +33,33 @@ N[t,]<-rbinom(n=labs,size=N[t-1,],prob=0.95)
 
 matplot(N[,1:5],type='l',lty=1)
 
-
-### Expected time to loss
-
-
-day.of.rec<-apply(N,2,function(x) min(which(x==0)))
-
-expected.day.of.rec<-mean(day.of.rec)
-var.day.of.rec<-var(day.of.rec)
-
-print(paste0("The expected day of reckoning is ",expected.day.of.rec, " with a variance of ", var.day.of.rec))
 ```
 
-I'm thinking of the distribution in this way, and please correct me if I go astray.  I have n binomial distributions and I'm asking what is the distribution of n, where it takes n bionmials to get 100 successes at a rate of 0.05. I think this is a negative binomial distribution given.   
 
-The distribution of time to this day of reckoning is a negative binomial distribution, where its parameters are $mu=$ `r expected.day.of.rec `
-and k= $\frac{\mu ^2}{VAR - \mu}$ where VAR = `r var.day.of.rec`.
+Now for each lab I calculate the first day the lab is without any test tubes, and plot the distribution.  
 
-This gives the distribution below
 
 
 ```{r}
-k<-(expected.day.of.rec^2)/(var.day.of.rec-expected.day.of.rec)
-nbinom<-data.frame(x=seq(0,400))
-
-nbinom<-mutate(nbinom,
-               pdf=dnbinom(x=x,mu = expected.day.of.rec,size=k)
-               )
-          
-pl <- ggplot(nbinom,aes(x=x))+geom_point(aes(y=pdf))+geom_line(aes(y=pdf))
-
-pl+ggtitle("Time to day of reckoning for the lab")+ theme_classic()+labs(y="Probability",x="Time (days) to DOF")
+### Expected time to loss
 
 
+day.of.rec<-data.frame(dor=apply(N,2,function(x) min(which(x==0))))
 
+expected.day.of.rec<-mean(day.of.rec$dor)
+var.day.of.rec<-var(day.of.rec)
+
+print(paste0("The expected day of reckoning is ",expected.day.of.rec, " with a variance of ", var.day.of.rec))
+
+ggplot(data=day.of.rec,mapping=aes(x=dor))+geom_histogram(binwidth=1,fill=NA,color='black', mapping=aes(y=..density..))+
+  theme_bw()+labs(y="Probability",x="Day of Reckoning")
 ```
+
+It looks like in most cases a lab in this situation will run out of test tubes around 75 to 125 days.  There is a long tail to distribution suggesting in some rare cases the lab will stay productive quite a bit longer than the average case ~100 days, which I suppose is good news for science.
 
 ### Exercise 13 
 
-
+Here we are looking to use the method of moments to analyze seed predation data.  I'll break the data up by species, distance, and number of seeds available, and model the distributions using a betabinomial model.  I'll then try to infer some biologically relevant information regarding the probability of a given seed being taken based on these variables.  
 ```{r}
 
 seeds <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/seedpred.csv",
@@ -77,51 +72,59 @@ ddply(seeds,~station+dist+species,summarize,
       tint=diff(date)) -> dat
 subset(dat,avail>0) -> dat
 
-seeds<-ddply(dat, .(avail), function(x){ summarize(x, sub.setted="Seeds",
+
+data.bb<-ddply(dat, .(dist,species,avail), function(x){ summarize(x,
                                                  n = unique(avail),
                                                  p=mean(taken)/n,
                                                  theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
-                                                 dist = NA,
-                                                 species = NA
+                                                 dist = unique(dist),
+                                                 species = unique(species)
                                                  )})
 
-distance<-ddply(dat, .(dist,avail), function(x){ summarize(x, sub.setted="Dist",
-                                                 n = unique(avail),
-                                                 p=mean(taken)/n,
-                                                 theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
-                                                 species = NA
-                                                 )})
-species<-ddply(dat, .(species,avail), function(x){ summarize(x, sub.setted="Species",
-                                                 n = unique(avail),
-                                                 p=mean(taken)/n,
-                                                 theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
-                                                 dist = NA
-                                                 )})
+head(data.bb)
+
+```
+Now I'll check how well this model works for a few of the distributions, as it would take many plots to explore them all.
 
 
-total.analysis<-rbind(seeds,distance,species)
-
-fiveseeds <- subset(dat,avail==5)
+```{r}
+fiveseeds <- subset(dat,avail==5 & dist == 10 & species %in% c("abz","cd","cor","dio") )
 pl <- ggplot(data=fiveseeds,mapping=aes(x=taken))+
 geom_histogram(binwidth=1,fill=NA,color='black', mapping=aes(y=..density..))+
-  theme_bw()
+  theme_bw()+facet_wrap(~species) 
 
-total.analysis<-subset(total.analysis,theta>0)
-require(emdbook)
-for(i in 1:length(total.analysis[,1])){ #length(total.analysis[,1]))
-  condition<-total.analysis[i,]
-  data.n<-condition$n
-  data.p<-condition$p
-  data.theta<- condition$theta
-pdf <- mutate(data.frame(x=seq(0,data.n)),
-              betabinom=dbetabinom(x=x,size=data.n,
-                                   prob=data.p,theta=data.theta))
-ggplot()+geom_point(data=pdf,aes(x=x+0.5,y=betabinom),size=data.n)
-}
+fiveseed.bb<-subset(data.bb,avail==5 & dist == 10 & species %in% c("abz","cd","cor","dio") )
+
+x<-seq(0,5)
+
+pdf<-apply(fiveseed.bb,1,function(y) dbetabinom(x=x,prob=as.numeric(y["p"]),
+                                                size=as.numeric(y["n"]),
+                                                theta=as.numeric(y["theta"])))
+pdf<-data.frame(cbind(pdf,x))
+fiveseed.bb$species<-as.character(fiveseed.bb$species)
+names(pdf)<-c(as.character(fiveseed.bb$species),"x")
+
+pdf.long<-melt(pdf,id.vars = .(x))
+pdf.long<-rename(pdf.long,c("variable"="species","value" = "bb"))
+
+pl+geom_point(data=pdf.long,aes(x=x+0.5,y=bb),size=5)+facet_wrap(~species)+ggtitle("Seed Predation at Distance = 10")
 
 ```
 
+These models seems to match the data reasonably well, but it would take more complex methods to determine how well they fit and our confidence with the estimations.
 
+Also, ideally I want to talk about the probability of seeds being taken given their species, and/or distance from the forest.  However it's not obvious or trivial how to obtain single estimates from my analysis above.  For each species and distance I have up to 5 models one each every possiblity for the number of seeds available.  To combine the estimated parameters into one, I suppose I could average, but I think it would have to be weighted and even then the manner of weighting the parameters is not straight forward.
 
+Here I will just look at the distance 10 and the species I plotted above. 
 
+```{r}
+fiveseed.bb
+```
+So it seems when 5 seeds are available under these conditions  "cd" is the most likely to be taken; however, I don't have any estimates of confidence for this observation and so it's hard to say if "cd" is actually more likely to be taken than other species say "abz".  The difficulty discussed above is seen when we look at the same species at the same distance when there are differences in the number of available seeds.
 
+```{r}
+fourseed.bb<-subset(data.bb,avail==4 & dist == 10 & species %in% c("abz","cd","cor","dio") )
+fourseed.bb
+
+```
+Now "abz" is the most-likely to be taken and all the probabilities are different than when there were 5 seeds present.  But I don't expect there is a change in the process here.  It should be the same binomial distribution just with a different n.  So what is the real p?  If I understood class today we can find it by using maximum likelihood estimators.
