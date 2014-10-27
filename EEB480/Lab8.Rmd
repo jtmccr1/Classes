@@ -4,12 +4,18 @@ author: "JT McCrone"
 date: "October 20, 2014"
 output: html_document
 ---
+```{r}
+require(ggplot2)
+require(plyr)
 
+
+
+```
 
 ### Exercise 2
 ```{r}
-labs<-200   # The number of labs
-N<-matrix(data=NA,nrow=200,ncol=labs)
+labs<-1E5  # The number of labs
+N<-matrix(data=0,nrow=400,ncol=labs)
 N[1,]<-rep(x=100,times=labs)     # We begin with 100 test tubes
 
 t<-1  # We set t =1 above
@@ -18,7 +24,104 @@ while(any(N[t,]>0)){
 N[t,]<-rbinom(n=labs,size=N[t-1,],prob=0.95)
 }
 
+matplot(N[,1:5],type='l',lty=1)
 
-matplot(N,type='l',lty=1)
+
+### Expected time to loss
+
+
+day.of.rec<-apply(N,2,function(x) min(which(x==0)))
+
+expected.day.of.rec<-mean(day.of.rec)
+var.day.of.rec<-var(day.of.rec)
+
+print(paste0("The expected day of reckoning is ",expected.day.of.rec, " with a variance of ", var.day.of.rec))
 ```
+
+I'm thinking of the distribution in this way, and please correct me if I go astray.  I have n binomial distributions and I'm asking what is the distribution of n, where it takes n bionmials to get 100 successes at a rate of 0.05. I think this is a negative binomial distribution given.   
+
+The distribution of time to this day of reckoning is a negative binomial distribution, where its parameters are $mu=$ `r expected.day.of.rec `
+and k= $\frac{\mu ^2}{VAR - \mu}$ where VAR = `r var.day.of.rec`.
+
+This gives the distribution below
+
+
+```{r}
+k<-(expected.day.of.rec^2)/(var.day.of.rec-expected.day.of.rec)
+nbinom<-data.frame(x=seq(0,400))
+
+nbinom<-mutate(nbinom,
+               pdf=dnbinom(x=x,mu = expected.day.of.rec,size=k)
+               )
+          
+pl <- ggplot(nbinom,aes(x=x))+geom_point(aes(y=pdf))+geom_line(aes(y=pdf))
+
+pl+ggtitle("Time to day of reckoning for the lab")+ theme_classic()+labs(y="Probability",x="Time (days) to DOF")
+
+
+
+```
+
 ### Exercise 13 
+
+
+```{r}
+
+seeds <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/seedpred.csv",
+                  comment.char="#",
+colClasses=c(date="Date",station='factor', dist='factor',species='factor'))
+seeds <- arrange(seeds,station,dist,species,date)
+ddply(seeds,~station+dist+species,summarize,
+      avail=head(seeds,-1),
+      taken=-diff(seeds),
+      tint=diff(date)) -> dat
+subset(dat,avail>0) -> dat
+
+seeds<-ddply(dat, .(avail), function(x){ summarize(x, sub.setted="Seeds",
+                                                 n = unique(avail),
+                                                 p=mean(taken)/n,
+                                                 theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
+                                                 dist = NA,
+                                                 species = NA
+                                                 )})
+
+distance<-ddply(dat, .(dist,avail), function(x){ summarize(x, sub.setted="Dist",
+                                                 n = unique(avail),
+                                                 p=mean(taken)/n,
+                                                 theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
+                                                 species = NA
+                                                 )})
+species<-ddply(dat, .(species,avail), function(x){ summarize(x, sub.setted="Species",
+                                                 n = unique(avail),
+                                                 p=mean(taken)/n,
+                                                 theta =-n*(mean(taken)*(mean(taken)-n)+var(taken))/((mean(taken)*(mean(taken)-n)+n*var(taken))),
+                                                 dist = NA
+                                                 )})
+
+
+total.analysis<-rbind(seeds,distance,species)
+
+fiveseeds <- subset(dat,avail==5)
+pl <- ggplot(data=fiveseeds,mapping=aes(x=taken))+
+geom_histogram(binwidth=1,fill=NA,color='black', mapping=aes(y=..density..))+
+  theme_bw()
+
+total.analysis<-subset(total.analysis,theta>0)
+require(emdbook)
+for(i in 1:length(total.analysis[,1])){ #length(total.analysis[,1]))
+  condition<-total.analysis[i,]
+  data.n<-condition$n
+  data.p<-condition$p
+  data.theta<- condition$theta
+pdf <- mutate(data.frame(x=seq(0,data.n)),
+              betabinom=dbetabinom(x=x,size=data.n,
+                                   prob=data.p,theta=data.theta))
+ggplot()+geom_point(data=pdf,aes(x=x+0.5,y=betabinom),size=data.n)
+}
+
+```
+
+
+
+
+
