@@ -1,0 +1,35 @@
+---
+title: "Lab9"
+author: "JT McCrone"
+date: "October 29, 2014"
+output: html_document
+---
+```{r}
+require(plyr)
+require(ggplot2)
+require(reshape2)
+require(grid)
+require(scales)
+options(stringsAsFactors=FALSE)
+theme_set(theme_bw())
+gt <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/gophertortoise.csv",
+                comment.char="#",colClasses=c(date="Date",
+                                              sex="factor",elisa="factor"))
+arrange(gt,carapace.length,date) -> gt
+
+gt1 <- ddply(gt,~id,subset,date==min(date))
+dim(gt1)
+
+mutate(gt1,serostatus=ifelse(elisa=="neg",0,1)) -> gt1
+head(gt1)
+
+loglik <- function (p, serostatus) { sum(dbinom(x=serostatus,size=1,
+                                                prob=p,log=TRUE))
+                                    }
+
+
+
+
+
+
+
