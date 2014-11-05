@@ -4,12 +4,20 @@ author: "JT McCrone"
 date: "October 29, 2014"
 output: html_document
 ---
-```{r}
+I have tried to include comment showing my thought process throughout this lab.  
+
+```{r,echo=FALSE}
 require(plyr)
 require(ggplot2)
 require(reshape2)
 require(grid)
 require(scales)
+require(bbmle)
+```
+
+
+Here we'll load the data for the model.
+```{r}
 options(stringsAsFactors=FALSE)
 theme_set(theme_bw())
 gt <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/gophertortoise.csv",
@@ -27,9 +35,66 @@ loglik <- function (p, serostatus) { sum(dbinom(x=serostatus,size=1,
                                                 prob=p,log=TRUE))
                                     }
 
+haznll<-function(alpha,carapace.length,serostatus){
+  -loglik(p=1-exp(-alpha*carapace.length),serostatus)  # The pobability of being seropositive (1) is 1-exp(-alpha*a) the prob of being seronegative
+}
+```
+
+In order to get an idea for a starting point for alpha I'll look accros the ages and see how the parameter changes.  To do this I'll group the data together by carapace.length in bins of 25 cm and estimate the age of the group as the mean of the carapace length.  Here I am looking at the probablity of being serotype negative as this is what is most apparent from the equation linking probablility and carapace length in the survival approach.
+
+```{r}
+groups<-seq(range(gt1$carapace.length)[1],range(gt1$carapace.length)[2],by=25)
+groups<-c(groups,range(gt1$carapace.length)[2])
+gt1$group<-apply(gt1,1,function(x) min(which(groups>=as.numeric(x["carapace.length"]))))
+
+moments<-ddply(gt1,~group, summarize, age=mean(carapace.length),neg=length(which(serostatus==0)),total.obs=length(serostatus),p.neg=neg/total.obs,alpha = log(p.neg)/(-age))
+
+moments
+```
+From here we can see that when $\alpha$ is not 0 it ranges between `range(subset(moments,alpha!=0)['alpha'])`.  I'll start mle2 at 0.005. 
+```{r}
+fit<-mle2(minuslogl = haznll,start = list(alpha=0.005),data=gt1)
+
+summary(fit)
+
+```
+
+With the model above I estimate the force of infection to be `coef(fit)` with $\text{cm}^{-1}$ as units with a 95% confidence interval of `confint(fit)`.  Which seems pretty tight around alpha.  The model certainly has a different shape when compared to the logistic regression don in class, but I just by looking at the fit I wouldn't say this one is better.  There seems to be a threshold in the data after which the probability for serotype positive increases rapidly that behavior is not captured here.
+
+```{r}
+mutate(gt1,fitted=with(as.list(coef(fit)),1-exp(-alpha*carapace.length))) -> gt1
+ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted),color='black')
+
+```
 
 
 
+```{r}
+alpha<-seq(0.0001,0.05,by=0.0001)
+loglike<-sum(dbinom(x=gt1$serostatus,size=1,
+                    prob=1-exp(-alpha*gt1$carapace.length),log=TRUE))
 
+```
+```{r}
+params <- data.frame(alpha=seq(0.0001,0.05,by=0.0001))
+                      
 
+ddply(params,~alpha,mutate,
+      loglik=with(gt1,-haznll(alpha,carapace.length,serostatus))) -> params
+
+maxloglike<-with(gt1,-haznll(coef(fit),carapace.length,serostatus))
+
+crit <- qchisq(p=0.95,df=1)/2 
+
+p1<-ggplot(data=params,mapping=aes(x=alpha,y=loglik))+ geom_line()+ggtitle("Likelihood Surface")+geom_hline(yintercept=c(maxloglike,maxloglike-crit),color="red")+geom_vline(xintercept=range(params$alpha[params$loglik>maxloglike-crit]),linetype=2,color="red")+ylim(-150,-25)+xlim(0,0.02)+geom_point(aes(x=coef(fit),y=maxloglike),size=5)
+crit2 <- qchisq(p=0.99,df=1)/2 
+p1<-p1+geom_hline(yintercept=c(maxloglike,maxloglike-crit2),color="blue")+geom_vline(xintercept=range(params$alpha[params$loglik>maxloglike-crit2]),linetype=2,color="blue")
+crit3 <- qchisq(p=0.50,df=1)/2;
+p1+geom_hline(yintercept=c(maxloglike,maxloglike-crit3),color="green")+geom_vline(xintercept=range(params$alpha[params$loglik>maxloglike-crit3]),linetype=2,color="green")
+
+p1+ scale_fill_manual(values=c("red", "blue", "green"), 
+                       name="Confidence intervals",
+                       labels=c("95%", "99%", "50%"))+ theme(legend.position=c(.5, .5))
+```
+### Exercise 2
 
