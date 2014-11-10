@@ -178,7 +178,7 @@ ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrip
 
 ***Thoughts?***
 
-> Both models seem to fit the trend of the Parus Major data.  There is certainly variation on either side of the fit that is not captured, but the fit seems reasonable.  As for the Thrips data set, here the Ricker model does not fit the data very well. There is large deviation from the predicted values when the $N_{t-1} $ populaiton is small and the model seems to be swayed largely by the few data points near $N_{t-1}=600$.  The gompertz model is able to capture the trend in the data much better.  
+> Both models seem to fit the trend of the Parus Major data.  There is certainly variation on either side of the fit that is not captured, but the fit seems reasonable.  As for the Thrips data set, here the Ricker model does not fit the data very well. There is large deviation from the predicted values when the $N_{t-1}$ populaiton is small and the model seems to be swayed largely by the few data points near $N_{t-1}=600$.  The gompertz model is able to capture the trend in the data much better.  
 
 ### Exercise 6
 Now we'll look at how the p-values associeated with the t-tests in the models compare to the an F-tests in anova.  This is where my understanding is a little fuzzy.
@@ -191,6 +191,20 @@ anova(Ricker.p,Ricker.p.1)
 ```
 I can see the F statistic given by the Anova comparision matches the p-value of the Nt_1 coefficient, but I'm not sure how to get a comparision for the intercept.  Also I'm not sure what the relationship between the confidence intervals and the p-value would be.  If we collected this data 100 times and ran the anaylsis we would expect 95 times the true paratemer would be in the confidence interval, and the small the p-value I would expect the tighter the confidence interval.  Although I don't understand how to express the exact relationship or if this answers the question.
 ***This is something it would be easier to discuss in person.***
+
+> Using confit we can see that as the level of confidence decreases the area covered by the confindence interval also decreases.  Which makes sense since as larger p level must include the true parameter more often. I'm looking just at the intercept here for ease of plotting
+
+```{r}
+require(reshape2)
+cons<-as.data.frame(rbind(confint(Ricker.p,level=0.95),
+confint(Ricker.p, level= 0.9),
+confint(Ricker.p,level = 0.50)))
+cons<-cbind(cons,p.level=c(0.95,0.95,0.9,0.9,0.5,0.5))
+cons$params<-c("intercept","Nt_1","intercept","Nt_1","intercept","Nt_1")
+rename(cons,c("2.5 %" = "min", "97.5 %" = "max"))->cons
+cons.long<-melt(cons,id.vars=c("p.level","params"))
+ggplot(subset(cons.long,params=="intercept"),mapping=aes(x=value,y=p.level,group=p.level,color=as.factor(p.level)))+geom_line()
+```
 
 ###Exercise 7
 
@@ -228,6 +242,16 @@ $$
 \text{log}\frac{N_t}{N_{t-1}} = B + C\text{log}N_{t-1} + \beta M + \epsilon _t
 $$
 where $M$ is the month of the year.
+> Here I'll treat month as a factor which is more biologically relevant. I'll use this model as I rework the analysis and my conclusions below.
+
+
+
+```{r}
+months.fac<-lm(data=thrips,log.Nt.Nt_1~log.Nt_1+as.factor(month))
+summary(months.fac)
+
+```
+> Here we can see that there is a parameter which is added to correct for the seasonality of the population when modeling each particluar month.
 
 ### Exercise 9
 Now we'll look to see if the assumptions of the models were met in our analysis, begining with the Parus data and Gompertz model
@@ -236,16 +260,19 @@ plot(Gomp.p)
 require(lmtest)
 ```
 A) Heteroskedasticity - The Breusch-Pagan test rejects ***[did you read that correctly?]*** the null hypothesis that the residues are not dependent on the log(Nt_1)  ***[not quite right: have another look at the documentation]***.  This is evidence for heteroskedasitcity.
+
+> The P.value for the Breusch-Pagan test is 0.7418 so we fail to reject the null hypothesis of homoskedasitcity
+
 ```{r}
 bptest(Gomp.p)
 
 ```
-B)Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
+B)Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are normally distributed.
 ```{r}
 shapiro.test(residuals(Gomp.p))
 ```
 C)Inlfuential points -  From the Residuals vs. Leverage plot above it doesn't seem like there are points in particular at are driving the fit, although 24 and 22 seem to be more influential than most.
-D) Autocorrelation in the residuals - There seems to be autocorrelation present which is not suprising given the observed correlation between the population and time seen above.
+D) Autocorrelation in the residuals - Here again we can not regect the null hypthesis that autocorrelation is 0.
 ```{r}
 dwtest(Gomp.p)
 
@@ -253,33 +280,52 @@ dwtest(Gomp.p)
 
 E) The parameter estimations of rate of growth r is 0.936.  This seems reasonable.  I first thought it would result in a negative growth, but looking at the equations I can see that that is not the case.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  ***How does it look relative to the observed population sizes?***  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
 
+> As mentioned above, there are cases where the population exceeds 200 birds; however, these cases are almost always followed by a decline of the population.  So while 200 can't be the carrying capacity, since it is exceeded, it probably isn't far off.
+
 ### Exercise 10
 For the Thrips data I'll be using my Gompertz and month model.  Am I interpretting these tests correctly?
 ```{r}
 plot(months.ad)
-require(lmtest)
+
 ```
 A) Heteroskedasticity - The Breusch-Pagan test fails to regect the null hypothesis at a p-value cut off of 0.05. Suggesting that the residues are not dependent on model variables which is evidence for homoskedasitcity.
 ***No, you're reading this incorrectly.  It does reject the null.***
+
+> Here we do reject the null in support of Heteroskedasticity.
+
 ```{r}
 bptest(months.ad)
 
 ```
-B) Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are non-normal.
+B) Lack of normality - Shapiro-Wilk test fails to regect the hypthesis that the residuals are normal, although it is close.
 ```{r}
 shapiro.test(residuals(months.ad))
 ```
 C)Inlfuential points -  From the Residuals vs. Leverage plot above it doesn't seem like there are points in particular at are driving the fit, although 68,80,and 81 seem to be more influential than most.
 
 D) Autocorrelation in the residuals - There seems to be autocorrelation present which is not suprising given the observed correlation between the population and time seen above. Although I don't know the implications this test has since I tried to model the time aspect of the data in this model.  ***I don't think you're reading this one correctly, either.***
+
+> Again I was readying theses tests backwards.  We can not reject the null hypothesis in favor of the alternative suggesting that autocorrelation is greater than 0.
+
 ```{r}
 dwtest(months.ad)
 
 ```
 
-### Adjust comments to thrips
+
 E) The parameter estimations seem valid.  The growth rate is positive and so is the month parameter which suggest the population grows throughout the year.  It may have been better to model seasons as in my model the weather around November and December (11 and 12) is similar to January (1) and this is difficult to grasp in how my model is set up.
 ***Try modeling the month as factor.***
+
+
+> If we look at months as a factor the model does marginally better although there is still not enought evidence to suggest homoskedasticity and we reject the hypothesis that the residuals are normally distributed. 
+
+```{r}
+bptest(months.fac)
+shapiro.test(residuals(months.fac))
+dwtest(months.fac)
+```
+
+
 
 ### Fitting the thrips data
 
@@ -293,20 +339,35 @@ months.ad.trained<-months.ad<-lm(data=thrips_first_half,log.Nt.Nt_1~log.Nt_1+mon
 
 mutate(thrips,trained_prediction=predict(months.ad.trained,newdata=thrips),out.of.fit=(year>1935))->thrips
 
-ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1))+geom_point()+ggtitle("Thrips Gompertz") +ggtitle("Thrips Gompertz")+xlab("Log(Nt_1)")+ylab("Log(Nt/Nt_1)")  +geom_line(mapping=aes(x=log.Nt_1,y=trained_prediction))+facet_grid(~out.of.fit,labeller=label_both)
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1-trained_prediction))+geom_point()+ggtitle("Thrips Gompertz Residuals") +xlab("Log(Nt_1)")+ylab("Residual") +geom_hline(yintercept=0,)+ facet_grid(~out.of.fit,labeller=label_both)
 
+#geom_line(mapping=aes(x=log.Nt_1,y=trained_prediction))+
 ```
 It is difficult to see how well this model fits the new data because there is a temporal ascpect to the data and model that is underlying the plots but not apparent in the 2D plot.
 ***There might be better ways of visualizing the fit.***
 
 ```{r}
 
-ddply(thrips,~out.of.fit,summarize,R2=1-sum((log.Nt.Nt_1-trained_prediction)^2)/sum((log.Nt.Nt_1-mean(log.Nt.Nt_1))^2))
+ddply(thrips,~out.of.fit,summarize,R2=1-sum((log.Nt.Nt_1-trained_prediction)^2,na.rm = T)/sum((log.Nt.Nt_1-mean(log.Nt.Nt_1,na.rm = T))^2,na.rm = T))
 ```
 It seems the model fits the test data better than it does the training data set ***[I don't see that at all!]*** which is not what I expected.  Maybe the model fits better becuase the testing data set stops at in the mid of an oscilation and perhaps the model has difficulty following these large population shifts.  But that's just an idea.
 ***Try removing the NAs by setting 'na.rm=TRUE' in 'sum' and 'mean'.***
 
 
+> Now we can see that the $R^2$ for the out of fit data set is > than that of the data used to train the model. This suggests the model fits the out of fit data better than the in fit data.  This is plausible based on the residual plot above. Just for fun lets see how the model where months are factors does.
+
+```{r}
+
+months.frac.trained<-lm(data=thrips_first_half,log.Nt.Nt_1~log.Nt_1+as.factor(month))
+
+mutate(thrips,trained_prediction.frac=predict(months.frac.trained,newdata=thrips),out.of.fit=(year>1935))->thrips
+
+ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1-trained_prediction.frac))+geom_point()+ggtitle("Thrips Gompertz Residuals") +xlab("Log(Nt_1)")+ylab("Residual") +geom_hline(yintercept=0,)+ facet_grid(~out.of.fit,labeller=label_both)
+
+ddply(thrips,~out.of.fit,summarize,R2=1-sum((log.Nt.Nt_1-trained_prediction.frac)^2,na.rm = T)/sum((log.Nt.Nt_1-mean(log.Nt.Nt_1,na.rm = T))^2,na.rm = T))
+```
+
+> Overall, these model match the data much better than do the models that treat month as an integer.  Also we have the case here were the model matches the data used to train it better than it does the data not included in the training set. Again the residual plot above suggests this trend
 
 ### Exercise 12
 

@@ -111,6 +111,73 @@ $$
 $$
 
 
-if (!is.finite(ll)) ll<--1e20
+```{r}
+lm(moments$lambda~moments$age)
+nll<-function(b,m,carapace.length,serostatus){
+  prob<-1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))
+  ll<- -loglik(p=prob,serostatus)
+  print(prob)
+  print(paste0("b=",b," m=",m))
+if (!is.finite(ll)){
+ll<- -1e20
+}
+print(ll)
+ll
+}
 
-p=1-exp(-(lambda0*carapace.length+(carapace.length/lambda1)^2)),serotype
+fit2<-mle2(minuslogl = nll,start = list(b=-0.002,m=0.0000287),data=gt1)
+```
+A plot with the force of infection over age.
+
+```{r}
+mutate(gt1,fitted2=with(as.list(coef(fit2)),1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))),
+       force.i=with(as.list(coef(fit2)),m*carapace.length+b)) -> gt1
+
+ggplot(data=gt1,mapping=aes(x=carapace.length,y=force.i))+geom_line()
+```
+
+A plot with overlaid predictions and data
+```{r}
+
+ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted2),color='black')
+
+```
+
+Looking at the confidence intervals yeilds
+
+```{r}
+
+pfit2 <- profile(fit2)
+plot(pfit2)
+confint(pfit2)
+```
+
+
+Using contors to look across these parameters and their confidence intervals
+
+```{r}
+params <- expand.grid(a=seq(-8.76,-3.97,by=0.005),
+                      b=seq(0.021,0.043,0.0005))
+ddply(params,~a+b,mutate,
+      loglik=with(gt1,-nll(a,b,carapace.length,serostatus))) -> params
+breaks <- logLik(fit)-qchisq(p=c(0.5,0.8,0.9,0.95,0.99,0.999,0.9999),df=2)/2
+ggplot(data=params,mapping=aes(x=a,y=b,z=loglik))+
+  stat_contour(aes(color=..level..),breaks=breaks)+
+  geom_point(x=coef(fit)["a"],y=coef(fit)["b"],shape=3)+
+  labs(color=expression(log(L)))
+
+```
+
+
+
+
+
+
+
+
+
+### Exercise 3
+
+Here we'll compare the two models used above with one another as well as with the logit model used in class.
+
+?nested models
