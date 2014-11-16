@@ -69,13 +69,6 @@ ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=s
 ```
 
 
-
-```{r}
-lambda<-seq(0.0001,0.05,by=0.0001)
-loglike<-sum(dbinom(x=gt1$serostatus,size=1,
-                    prob=1-exp(-lambda*gt1$carapace.length),log=TRUE))
-
-```
 ```{r}
 params <- data.frame(lambda=seq(0.0001,0.05,by=0.0001))
                       
@@ -87,7 +80,7 @@ maxloglike<-with(gt1,-haznll(coef(fit),carapace.length,serostatus))
 
 crit <- qchisq(p=0.95,df=1)/2 
 
-p1<-ggplot(data=params,mapping=aes(x=lambda,y=loglik))+ geom_line()+ggtitle("Likelihood Surface")+geom_hline(yintercept=c(maxloglike-crit),color="red")+geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit]),linetype=2,color="red")+ylim(-100,-60)+xlim(0,0.015)+geom_point(aes(x=coef(fit),y=maxloglike),size=5)
+p1<-ggplot(data=params,mapping=aes(x=lambda,y=loglik))+ geom_line()+ggtitle("Likelihood Surface")+geom_hline(yintercept=c(maxloglike-crit),color="red")+geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit]),linetype=2,color="red")+ylim(-90,-80)+xlim(0,0.015)+geom_point(aes(x=coef(fit),y=maxloglike),size=5)
 crit2 <- qchisq(p=0.999,df=1)/2 
 p1<-p1+geom_hline(yintercept=c(maxloglike-crit2),color="blue")+geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit2]),linetype=2,color="blue")
 crit3 <- qchisq(p=0.50,df=1)/2;
@@ -113,20 +106,52 @@ $$
 
 ```{r}
 lm(moments$lambda~moments$age)
-nll<-function(b,m,carapace.length,serostatus){
+nll.op<-function(b,m,carapace.length,serostatus){
   prob<-1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))
   ll<- -loglik(p=prob,serostatus)
-  print(prob)
-  print(paste0("b=",b," m=",m))
 if (!is.finite(ll)){
-ll<- -1e20
+ll<- 1e20
 }
-print(ll)
 ll
 }
 
 fit2<-mle2(minuslogl = nll,start = list(b=-0.002,m=0.0000287),data=gt1)
 ```
+
+
+```{r}
+nll<-function(b,m,carapace.length,serostatus){
+  prob<-1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))
+  ll<- -loglik(p=prob,serostatus)
+}
+params <- expand.grid(b=seq(-0.001,0.01,by=0.0001),
+                      m=seq(-0.000001,0.0005,0.00001))
+ddply(params,~b+m,mutate,
+      loglik=with(gt1,-nll(b,m,carapace.length,serostatus))) -> params
+breaks <- logLik(fit)-qchisq(p=c(0.5,0.8,0.9,0.95,0.99,0.999,0.9999),df=2)/2
+p1<-as.list(c("b"=0.001,"m"=5e-5))
+p2<-as.list(c("b"=0.004,"m"=2.5e-5))
+ggplot(data=params,mapping=aes(x=m,y=b,z=loglik))+
+  stat_contour(aes(color=..level..),breaks=breaks)+
+  geom_point(x=p1['m'],y=p1["b"],shape=3)+ geom_point(x=p2['m'],y=p2["b"],shape=3)+
+  labs(color=expression(log(L)))
+
+```
+
+```{r}
+mutate(gt1,fitted2=with(p1,1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))),
+       fitted3=with(p2,1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length)))) -> gt3
+
+ggplot(data=gt3,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted2),color='black')+geom_line(aes(y=fitted3),color='blue')
+
+
+
+```
+
+
+```
+
+
 A plot with the force of infection over age.
 
 ```{r}
@@ -167,10 +192,6 @@ ggplot(data=params,mapping=aes(x=a,y=b,z=loglik))+
   labs(color=expression(log(L)))
 
 ```
-
-
-
-
 
 
 

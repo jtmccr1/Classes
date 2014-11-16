@@ -5,6 +5,8 @@ date: "October 1, 2014"
 output: html_document
 ---
 
+> I made corrections and comments to this resubmission using this font.  If it is too late to redeem points so be it.This has been on my to-do list for a while and it just needed a little more work.  I think we sorted everythign out in person, but I am still off in some place please let me know.  Thanks!!
+
 Before diving into this analysis I'd like to note that I in general I understand the processes involved in modeling these populations; however we start comparing the model with the anova generated statistics I start to get a little hazzy.  I also think I could use some feedback on my comments regarding the biological interpretations of the statistics and the validity of our assumptions.  I look forward to making adjustments to this assingment as my understanding of the material improves.
 
 ***Glad to see you're thoughtful about this and looking to learn more.  Maybe we can sit down sometime (during office hour?) and talk about it.***
@@ -121,12 +123,12 @@ K.G.p<-exp(coef(Gomp.p)[1]/alpha.p); K.G.p
 These models give slightly different estimates for carrying capacity but in all likelihood I think biologically they are very similary.  By these models it seems the carrying capacity is around 200 birds and the growth rate is slightly less than one.  I first I thought the growth rate would imply negative growth, but after looking at the equations I don't think that is the case.
 ***Do you know how to check to see if you're right?***
 
-> In looking at the Ricker equation for density dependent population growth $N_t=N_{t-1}\exp{r(1-\frac{N_{t-1}}{K})}$  We can see that $N_t<N_{t-1}$ only when $r(1-\frac{N_{t-1}}{K})<0$ which is certainly not required by $r<1$  So $r<1$ by no means requires negative growth
+> In looking at the Ricker equation for density dependent population growth $N_t=N_{t-1}\exp{r(1-\frac{N_{t-1}}{K})}$  We can see that $N_t<N_{t-1}$ only when $r(1-\frac{N_{t-1}}{K})<0$ which is certainly not required by $r<1$  So $r<1$ by no means requires negative growth.  In fact only when $r<0$ or $\frac{N_{t-1}}{K}>1$ will the growth be negative.
 
 I don't know much about bird ecology but 200 birds as a carrying capacity seems quite small.
 ***Not a big forest....***
 
-> In looking at the data there are cases where the population grows above 200 but these are almost always short lived and followed by a decrease in the population.  On average the number of birds seems to flucuate between 50 and 175 so 200 isn't that bad of an estimate.
+> In looking at the data there are cases where the population grows above 200 but these are almost always short lived and followed by a decrease in the population.  On average the number of birds seems to flucuate between 50 and 175 so 200 isn't that bad of an estimate.  That being said the carrying capacity should be the maximum population and so while 200 probably isn't far off, it can't be right.
 
 ###Exercise 4 
 Now we'll look at the thrips data set.
@@ -192,7 +194,7 @@ anova(Ricker.p,Ricker.p.1)
 I can see the F statistic given by the Anova comparision matches the p-value of the Nt_1 coefficient, but I'm not sure how to get a comparision for the intercept.  Also I'm not sure what the relationship between the confidence intervals and the p-value would be.  If we collected this data 100 times and ran the anaylsis we would expect 95 times the true paratemer would be in the confidence interval, and the small the p-value I would expect the tighter the confidence interval.  Although I don't understand how to express the exact relationship or if this answers the question.
 ***This is something it would be easier to discuss in person.***
 
-> Using confit we can see that as the level of confidence decreases the area covered by the confindence interval also decreases.  Which makes sense since as larger p level must include the true parameter more often. I'm looking just at the intercept here for ease of plotting
+> Using confit we can see that as the level of confidence decreases the area covered by the confindence interval also decreases.  Which makes sense since as larger p level must include the true parameter more often. Below I plot the confidence intervals for the intercept at differing p levles.  The intervals for the slope follow the same trend.
 
 ```{r}
 require(reshape2)
@@ -242,6 +244,7 @@ $$
 \text{log}\frac{N_t}{N_{t-1}} = B + C\text{log}N_{t-1} + \beta M + \epsilon _t
 $$
 where $M$ is the month of the year.
+
 > Here I'll treat month as a factor which is more biologically relevant. I'll use this model as I rework the analysis and my conclusions below.
 
 
@@ -280,7 +283,7 @@ dwtest(Gomp.p)
 
 E) The parameter estimations of rate of growth r is 0.936.  This seems reasonable.  I first thought it would result in a negative growth, but looking at the equations I can see that that is not the case.  The carry capacity is around 200 which also seems relatively low for a bird population in the woods.  ***How does it look relative to the observed population sizes?***  Given these observations and the statistical tests above it doesn't seem like the population density model accurately reflects the population dynamics of the Parus Major.
 
-> As mentioned above, there are cases where the population exceeds 200 birds; however, these cases are almost always followed by a decline of the population.  So while 200 can't be the carrying capacity, since it is exceeded, it probably isn't far off.
+> As I mentioned above, there are cases where the population exceeds 200 birds; however, these cases are almost always followed by a decline of the population.  So while 200 can't be the carrying capacity, since it is exceeded, it probably isn't far off.
 
 ### Exercise 10
 For the Thrips data I'll be using my Gompertz and month model.  Am I interpretting these tests correctly?
@@ -305,7 +308,7 @@ C)Inlfuential points -  From the Residuals vs. Leverage plot above it doesn't se
 
 D) Autocorrelation in the residuals - There seems to be autocorrelation present which is not suprising given the observed correlation between the population and time seen above. Although I don't know the implications this test has since I tried to model the time aspect of the data in this model.  ***I don't think you're reading this one correctly, either.***
 
-> Again I was readying theses tests backwards.  We can not reject the null hypothesis in favor of the alternative suggesting that autocorrelation is greater than 0.
+> Again I was reading theses tests backwards.  We can not reject the null hypothesis in favor of the alternative suggesting that autocorrelation is greater than 0.
 
 ```{r}
 dwtest(months.ad)
@@ -317,7 +320,7 @@ E) The parameter estimations seem valid.  The growth rate is positive and so is 
 ***Try modeling the month as factor.***
 
 
-> If we look at months as a factor the model does marginally better although there is still not enought evidence to suggest homoskedasticity and we reject the hypothesis that the residuals are normally distributed. 
+> If we look at months as a factor the model does marginally better than do the models above. We fail to reject the null hypothesis for homoskedasticity, just barely but we reject the hypothesis that the residuals are normally distributed. 
 
 ```{r}
 bptest(months.fac)
@@ -345,6 +348,8 @@ ggplot(thrips,mapping=aes(x=log.Nt_1,y=log.Nt.Nt_1-trained_prediction))+geom_poi
 ```
 It is difficult to see how well this model fits the new data because there is a temporal ascpect to the data and model that is underlying the plots but not apparent in the 2D plot.
 ***There might be better ways of visualizing the fit.***
+
+> I have changed these plots to residuals to give a better idea of the fit.
 
 ```{r}
 
