@@ -1,0 +1,194 @@
+---
+title: "MCMC exercise"
+author: "JT McCrone"
+date: "November 19, 2014"
+output: html_document
+---
+```{r,echo=FALSE}
+require(plyr)
+require(ggplot2)
+require(reshape2)
+require(coda)
+```
+
+
+We begin by estimating the constnat force of infection in the gopher tortoise example.
+
+```{r}
+options(stringsAsFactors=FALSE)
+theme_set(theme_bw())
+gt <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/gophertortoise.csv",
+                comment.char="#",colClasses=c(date="Date",
+                                              sex="factor",elisa="factor"))
+arrange(gt,carapace.length,date) -> gt
+
+gt1 <- ddply(gt,~id,subset,date==min(date))
+dim(gt1)
+
+mutate(gt1,serostatus=ifelse(elisa=="neg",0,1)) -> gt1
+head(gt1)
+```
+
+I'll use a uniform prior between 0.00001 and 0.001 as we know $\lambda$ has to be on the order of 0.0001 just from looking at the scale of the data and our model.
+
+```{r}
+log.prior<-function(lambda){
+  dunif(lambda,min = 0.0001,max=0.01,log=T)
+}
+log.lik <- function (p, serostatus) { sum(dbinom(x=serostatus,size=1,
+                                                prob=p,log=TRUE))
+                                    }
+hazll<-function(lambda,carapace.length=gt1$carapace.length,serostatus=gt1$serostatus){
+  log.lik(p=1-exp(-lambda*carapace.length),serostatus)  # The pobability of being seropositive (1) is 1-exp(-lambda*a) the prob of being seronegative
+}
+
+
+rpropos<-function(lambda){
+  if (runif(1)<0.5) lambda +0.00001 else lambda-0.00001
+}
+
+```
+
+Now we'll run an MCMC chain for $10^5$ steps just to see if if works.
+
+
+```{r}
+chain<-numeric(1e5)
+lambda<-0.0003
+log.num<-hazll(lambda)+log.prior(lambda)
+for ( i in seq_along(chain)){
+  lambda.star<-rpropos(lambda)
+  log.num.star<-log.prior(lambda.star)+hazll(lambda.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    lambda<-lambda.star
+    log.num<-log.num.star
+    }
+  chain[i]<-lambda
+  }
+chain<-as.mcmc(chain)
+plot(chain)
+  
+summary(chain)
+
+
+
+```
+
+It doesn't look like the chain has converged.
+
+```{r}
+raftery.diag(chain)
+
+```
+
+So I'll do $2X10^7$ steps now with a burn in of $10^5$ because at $10^5$ I had a burn of of about 2,000. Am I right to think that if I do $10^2$ more steps then I'll need $10^2$ times as many burn in steps? I'm not sure how to pick the thining factor so I'll use 300 like we did in class.
+
+```{r,cache=T}
+chain<-numeric(2e7)
+lambda<-0.0003
+log.num<-hazll(lambda)+log.prior(lambda)
+for ( i in seq_along(chain)){
+  lambda.star<-rpropos(lambda)
+  log.num.star<-log.prior(lambda.star)+hazll(lambda.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    lambda<-lambda.star
+    log.num<-log.num.star
+    }
+  chain[i]<-lambda
+  }
+chain<-window(as.mcmc(chain),start=1e5,thin=300)
+plot(chain)
+  
+summary(chain)
+
+
+
+```
+
+
+Trying it with the other model.
+
+
+
+```{r}
+
+log.prior.a<-function(a){
+  dunif(a,min = -1,max=1,log=T)
+}
+log.prior.b<-function(b){
+  dunif(b,min = 1,max=1000,log=T)
+}
+
+ab.log.lik<-function(a,b,carapace.length=gt1$carapace.length,serostatus=gt1$serostatus){
+  log.lik(p=1-exp(-(carapace.length/b)^a),serostatus) 
+}
+
+
+rpropos.a<-function(a){
+  if (runif(1)<0.5) a +0.01 else a-0.01
+}
+
+rpropos.b<-function(b){
+  if (runif(1)<0.5) b +1 else b-1
+}
+```
+
+To start I'll set a and b to -0.12 and 10 respectively
+```{r}
+iters<-1e5
+chain<-matrix(data = rep(NA,times=iters*2),ncol = 2)
+a<- -0.12
+b<- 10
+log.num<-ab.log.lik(a,b)+log.prior.a(a)+log.prior.b(b)
+for ( i in seq.int(iters)){
+  a.star<-rpropos.a(a)
+  b.star<-rpropos.b(b)
+  log.num.star<-ab.log.lik(a.star,b.star)+log.prior.a(a.star)+log.prior.b(b.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    a<-a.star
+    b<-b.star
+    log.num<-log.num.star
+    }
+  chain[i,1]<-a
+  chain[i,2]<-b
+  }
+chain<-as.mcmc(chain)
+plot(chain)
+  
+summary(chain)
+
+```
+
+It looks like a is being limited by the range here so lets extend it.
+```{r}
+log.prior.a<-function(a){
+  dunif(a,min = -1,max=100,log=T)
+}
+
+iters<-1e5
+chain<-matrix(data = rep(NA,times=iters*2),ncol = 2)
+a<- -0.12
+b<- 10
+log.num<-ab.log.lik(a,b)+log.prior.a(a)+log.prior.b(b)
+for ( i in seq.int(iters)){
+  a.star<-rpropos.a(a)
+  b.star<-rpropos.b(b)
+  log.num.star<-ab.log.lik(a.star,b.star)+log.prior.a(a.star)+log.prior.b(b.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    a<-a.star
+    b<-b.star
+    log.num<-log.num.star
+    }
+  chain[i,1]<-a
+  chain[i,2]<-b
+  }
+chain<-as.mcmc(chain)
+plot(chain)
+  
+summary(chain)
+
+```
