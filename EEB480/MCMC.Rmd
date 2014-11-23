@@ -4,17 +4,22 @@ author: "JT McCrone"
 date: "November 19, 2014"
 output: html_document
 ---
-```{r,echo=FALSE}
+```{r,echo=FALSE,message=FALSE}
 require(plyr)
 require(ggplot2)
 require(reshape2)
 require(coda)
+require(bbmle)
+require(knitr)
+require(scales)
 ```
 
 
-We begin by estimating the constnat force of infection in the gopher tortoise example.
+## Constant force of infection
 
-```{r}
+I'll start by loading the data as we did in Lab 9.
+
+```{r,cache=TRUE}
 options(stringsAsFactors=FALSE)
 theme_set(theme_bw())
 gt <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/gophertortoise.csv",
@@ -29,9 +34,28 @@ mutate(gt1,serostatus=ifelse(elisa=="neg",0,1)) -> gt1
 head(gt1)
 ```
 
-I'll use a uniform prior between 0.00001 and 0.001 as we know $\lambda$ has to be on the order of 0.0001 just from looking at the scale of the data and our model.
 
-```{r}
+I'll start by using mle2 to estimate the constant force of infection to give us a reference for how well the MCMC method does.
+
+```{r,cache=TRUE}
+log.lik <- function (p, serostatus) { sum(dbinom(x=serostatus,size=1,
+                                                prob=p,log=TRUE))
+                                    }
+haznll<-function(lambda,carapace.length=gt1$carapace.length,serostatus=gt1$serostatus){
+  -log.lik(p=1-exp(-lambda*carapace.length),serostatus)  # The pobability of being seropositive (1) is 1-exp(-lambda*a) the prob of being seronegative
+}
+
+fit<-mle2(minuslogl = haznll,start = list(lambda=0.005),data=gt1)
+
+summary(fit)
+confint(fit)
+
+```
+
+
+I'll use a uniform prior between 0.00001 and 0.001 as we know $\lambda$ has to be on the order of 0.0001 just from looking at the scale of the data and our model. ( And I suppose from the mle estimate, but if the carapace length in on the order of 100 and $P = 1- \exp(- \lambda \cdot \text{carapace.length})$ then we can set these limits without the information from mle2).
+
+```{r,cache=TRUE}
 log.prior<-function(lambda){
   dunif(lambda,min = 0.0001,max=0.01,log=T)
 }
@@ -49,10 +73,9 @@ rpropos<-function(lambda){
 
 ```
 
-Now we'll run an MCMC chain for $10^5$ steps just to see if if works.
+Now we'll run an MCMC chain for $10^5$ steps and see how we do. Initially I'm taking step sizes of 1e0-5.
 
-
-```{r}
+```{r,cache=TRUE}
 chain<-numeric(1e5)
 lambda<-0.0003
 log.num<-hazll(lambda)+log.prior(lambda)
@@ -71,21 +94,16 @@ plot(chain)
   
 summary(chain)
 
-
-
 ```
 
-It doesn't look like the chain has converged.
+Clearly the trace has not converged here so I'm going to up the step size to 1e-4 and see if that gets us closer.
+```{r,cache=TRUE}
 
-```{r}
-raftery.diag(chain)
 
-```
-
-So I'll do $2X10^7$ steps now with a burn in of $10^5$ because at $10^5$ I had a burn of of about 2,000. Am I right to think that if I do $10^2$ more steps then I'll need $10^2$ times as many burn in steps? I'm not sure how to pick the thining factor so I'll use 300 like we did in class.
-
-```{r,cache=T}
-chain<-numeric(2e7)
+rpropos<-function(lambda){
+  if (runif(1)<0.5) lambda +0.0001 else lambda-0.0001
+}
+chain<-numeric(1e5)
 lambda<-0.0003
 log.num<-hazll(lambda)+log.prior(lambda)
 for ( i in seq_along(chain)){
@@ -98,19 +116,98 @@ for ( i in seq_along(chain)){
     }
   chain[i]<-lambda
   }
-chain<-window(as.mcmc(chain),start=1e5,thin=300)
+chain<-as.mcmc(chain)
+plot(chain)
+  
+summary(chain)
+```
+
+
+It is definitely better, but the trace seems to be a little wavy and so initially I don't think the chain has converged ( although we aren't too far off the mle estimate)
+
+Let's run some tests and see where we lie.
+```{r}
+raftery.diag(chain)
+```
+So it looks like we might want to try somewhere around $2e^6$ steps with a burn in of about 1000.  Am I reading this right that if I increase my steps by 10 fold I should increase the burn-in by that as well?  
+```{r}
+heidel.diag(chain)
+```
+The Heidelberger and Welch's convergence diagnostic suggests the chain has converged, and the null hypothesis of sampling from a stationary distribution is accepted. We'll see if the other diagnostics agree.
+```{r}
+geweke.diag(chain)
+```
+This isn't terrible and suggests the means of the first 10% of the chain and that of the last 50% are within one-fifth standard deviation of one another.
+```{r}
+autocorr.diag(chain)
+autocorr.plot(chain)
+```
+
+While the above statistics may suggest convergence we can see that there is still quite a bit of auto correlation between the points on the chain.  
+```{r}
+effectiveSize(chain)
+rejectionRate(chain)
+```
+
+
+So let's try to run a longer chain and thin with a factor of 500.  
+
+```{r,cache=TRUE}
+rpropos<-function(lambda){
+
+  if (runif(1)<0.5) lambda +0.0001 else lambda-0.0001
+  
+}
+chain<-numeric(1e7)
+lambda<-0.0003
+log.num<-hazll(lambda)+log.prior(lambda)
+for ( i in seq_along(chain)){
+  lambda.star<-rpropos(lambda)
+  log.num.star<-log.prior(lambda.star)+hazll(lambda.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    lambda<-lambda.star
+    log.num<-log.num.star
+    }
+  chain[i]<-lambda
+  }
+chain<-as.mcmc(chain)
+rejectionRate(chain)
+
+chain<-window(chain,start=1000,thin=500)
 plot(chain)
   
 summary(chain)
 
-
-
 ```
 
+Initially the trace looks much more homogeneous. Although there are still some waves.
 
-Trying it with the other model.
+```{r}
+
+heidel.diag(chain)
+geweke.diag(chain)
+autocorr.diag(chain)
+autocorr.plot(chain)
+```
+
+The diagnostics look as convincing as before, but now we have taken care of the auto correlation issue. This MCMC method and mle2 have given similar answers $5.718e^{-3}$ and $5.704e^{-3}$ respectively each with a standard error of $5.891e^{-4}$.
 
 
+
+## Two parameter model
+
+Here we try to model the same data; however, we allow the force of infection to vary with the carapace length according to the following model.
+
+$$
+
+\lambda (L) = \frac{a}{b} \big(\frac{L}{b}\big) ^{a-1}
+
+$$
+
+It follows the probability of tortoise with length L being seropositive is $1- \exp (-\frac{L}{b}^a)$.
+
+To get an idea of the magnitude of the $a$ and $b$ in the above of equation I estimated that for a length of 100 mm and a probability of 50% $b=10$ and $a=-0.12$.  Now I know that there could be other solutions but this seems like a good place to start.  I'll also let the step sizes of b and a be 1 and 0.1 respectively.  *How sensitive are these methods to step size?  It seems like the step size should vary on the same order of magnitude as the solution. I keep thinking if the size was too big then we would converge to an inprecise estimate.  Is that reasoning right?*
 
 ```{r}
 
@@ -127,7 +224,7 @@ ab.log.lik<-function(a,b,carapace.length=gt1$carapace.length,serostatus=gt1$sero
 
 
 rpropos.a<-function(a){
-  if (runif(1)<0.5) a +0.01 else a-0.01
+  if (runif(1)<0.5) a +0.1 else a-0.1
 }
 
 rpropos.b<-function(b){
@@ -136,7 +233,7 @@ rpropos.b<-function(b){
 ```
 
 To start I'll set a and b to -0.12 and 10 respectively
-```{r}
+```{r,cache=TRUE}
 iters<-1e5
 chain<-matrix(data = rep(NA,times=iters*2),ncol = 2)
 a<- -0.12
@@ -162,14 +259,14 @@ summary(chain)
 
 ```
 
-It looks like a is being limited by the range here so lets extend it.
-```{r}
+It looks like a is being limited by the range here so lets extend it. 
+```{r,cache=TRUE}
 log.prior.a<-function(a){
   dunif(a,min = -1,max=100,log=T)
 }
 
 iters<-1e5
-chain<-matrix(data = rep(NA,times=iters*2),ncol = 2)
+chain.ab<-matrix(data = rep(NA,times=iters*2),ncol = 2)
 a<- -0.12
 b<- 10
 log.num<-ab.log.lik(a,b)+log.prior.a(a)+log.prior.b(b)
@@ -183,12 +280,138 @@ for ( i in seq.int(iters)){
     b<-b.star
     log.num<-log.num.star
     }
-  chain[i,1]<-a
-  chain[i,2]<-b
+  chain.ab[i,1]<-a
+  chain.ab[i,2]<-b
   }
-chain<-as.mcmc(chain)
-plot(chain)
+chain.ab<-as.mcmc(chain.ab)
+plot(chain.ab)
   
-summary(chain)
+summary(chain.ab)
+```
+
+
+These look better; however, it looks like my initial starting points were far from the convergent values.  And it seems they weren't so bad.  The algorithm spent a fair amount of time near the initial values before making its way to its final resting place.  However, just be looking at the plots it seems like I haven't quite achieved convergence.
+
+Let's look at some diagnostics.
+```{r}
+heidel.diag(chain.ab)
+```
+According to the Heidelberger and Welch’s diagnostics we have converged for both $a$ and $b$.
+
+```{r}
+geweke.diag(chain.ab)
+autocorr.diag(chain.ab)
+autocorr.plot(chain.ab)
+```
+
+Although the chain seems to have converged according to the Heidleberger and Welch diagnostic test, I'm not comfortable saying they have converged based on the Geweke convergence test.  The means of the first 10% and the last 50% of the both variable chains differ by well over 1 standard deviation.  This is most likely due to the artifact discussed above where both chains initial spend time at the starting values before moving to the final convergent values. There is clearly an auto correlation issue to be dealt with as well.
+
+
+```{r}
+raftery.diag(chain.ab)
+```
+The Raftery and Lewis diagnostic suggest we run about $4e^6$ iterations with a burn in of about 40,000.  This burn should remove the tendency we noticed early where the algorithm hesitates near the initial values.  This should better the Geweke's diagnostic values.  I'll also thin aggressively to take care of the auto correlation.   I ran this a few times before coming to the burn in and thinning parameters used here, but I'm just showing the final results for the sake for the sake of time and space.
+
+```{r, cache=TRUE}
+
+rpropos.a<-function(a){
+  if (runif(1)<0.5) a +.1 else a-.1
+}
+
+rpropos.b<-function(b){
+  if (runif(1)<0.5) b +1.0 else b-1.0
+}
+
+iters<-4e6
+chain.ab<-array(dim=c(iters,2))
+colnames(chain.ab)<-c("a","b")
+a<- -0.12
+b<- 10
+log.num<-ab.log.lik(a,b)+log.prior.a(a)+log.prior.b(b)
+for ( i in seq.int(iters)){
+  a.star<-rpropos.a(a)
+  b.star<-rpropos.b(b)
+  log.num.star<-ab.log.lik(a.star,b.star)+log.prior.a(a.star)+log.prior.b(b.star)
+  alpha<-exp(log.num.star-log.num)
+  if (runif(1)<alpha){
+    a<-a.star
+    b<-b.star
+    log.num<-log.num.star
+    }
+  chain.ab[i,1]<-a
+  chain.ab[i,2]<-b
+  }
+chain.ab<-as.mcmc(chain.ab)
+chain.ab.thin<-window(chain.ab,start=40000,thin=300)
+colnames(chain.ab.thin)<-c("a","b")
+plot(chain.ab.thin)
+  
+summary(chain.ab.thin)
+
 
 ```
+
+
+```{r}
+
+heidel.diag(chain.ab.thin)
+geweke.diag(chain.ab.thin)
+autocorr.diag(chain.ab.thin)
+autocorr.plot(chain.ab.thin)
+```
+
+So we can see now that we do a much better job of passing the Geweke diagnostics and have decreased the auto correlation substantially.  Let's see how we did compared to the mle answer.
+
+
+```{r,cache=TRUE}
+nll<-function(a,b,carapace.length=gt1$carapace.length,serostatus=gt1$serostatus){
+  -log.lik(p=1-exp(-(carapace.length/b)^a),serostatus) 
+}
+
+fit.ab<-mle2(minuslogl = nll,start = list(a=-0.12,b=10),data=gt1,control=list(maxit=1000))
+
+summary(fit.ab)
+```
+
+
+We can see from the table below that the estimates for each method are quite comparable.
+
+
+```{r,results='asis'}
+results<-data.frame(MLE2=coef(fit.ab),MCMC=c(mean(chain.ab.thin[,"a"]),mean(chain.ab.thin[,"b"])))
+kable(results,digits = 2)
+```
+
+
+To get verify that there is really no biological difference from these estimates I've plotted both fits against the data, and as we can see there is no real difference.
+```{r}
+MCMC<-list(a=mean(chain.ab.thin[,"a"]),b=mean(chain.ab.thin[,"b"]))
+mutate(gt1,MLE=with(as.list(coef(fit.ab)),1-exp(-(carapace.length/b)^a)),
+       MCMC=with(MCMC,1-exp(-(carapace.length/b)^a))) -> gt2
+
+ggplot(data=gt2,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=MLE,color="MLE"))+geom_line(aes(y=MCMC,color="MCMC"))
+
+```
+
+
+
+In some of my analysis it seemed like my estimates of $a=-0.12$ and $b=10$ were not terrible and the algorithm did spend some time in the vicinity.  To get an idea if this was a result of the log-likelihood landscape, I have plotted that below.
+
+
+
+```{r}
+params <- expand.grid(a=seq(-1,20,by=1),
+                      b=seq(1,500,10))
+ddply(params,~a+b,mutate,
+      loglik=with(gt1,-nll(a,b,carapace.length,serostatus))) -> params
+
+
+ggplot(data=params,mapping=aes(x=a,y=b,z=loglik))+
+ geom_tile(aes(fill=loglik))+
+  geom_contour(binwidth=2,color="black") 
+
+```
+
+There may be some area of higher log-likelihood near the starting point but we can see from the plot above, there is a distinctive peak defined in the vicinity of the parameter values estimated by each method.  
+
+The algorithms in this lab take a while to run. Is there a way to increase the efficiency of the method while not sacrificing accuracy?  
