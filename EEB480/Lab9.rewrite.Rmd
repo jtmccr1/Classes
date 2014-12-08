@@ -1,0 +1,310 @@
+---
+title: "Lab9"
+author: "JT McCrone"
+date: "October 29, 2014"
+output: html_document
+---
+I'm sorry this is so late.  I was having difficulty finding a model that would work for exercise 2. Thank you for your patience and I look forward to your comments.  I also had a hard time including legends on some of my plots.  Do you have any advice?
+
+> No worries.  Sorry to be late in getting this back to you!  I'll modify your codes to help you with the legends.
+
+```{r,echo=FALSE}
+require(plyr)
+require(ggplot2)
+require(reshape2)
+require(grid)
+require(scales)
+require(bbmle)
+```
+
+
+Here we'll load the data for the model. Arrange the data so we can work with it later, and set up the logit model done in class.
+```{r}
+options(stringsAsFactors=FALSE)
+theme_set(theme_bw())
+gt <- read.csv("http://kinglab.eeb.lsa.umich.edu/480/data/gophertortoise.csv",
+                comment.char="#",colClasses=c(date="Date",
+                                              sex="factor",elisa="factor"))
+arrange(gt,carapace.length,date) -> gt
+
+gt1 <- ddply(gt,~id,subset,date==min(date))
+dim(gt1)
+
+mutate(gt1,serostatus=ifelse(elisa=="neg",0,1)) -> gt1
+head(gt1)
+
+loglik <- function (p, serostatus) { sum(dbinom(x=serostatus,size=1,
+                                                prob=p,log=TRUE))
+                                    }
+
+
+logitnll<-function(a, b, carapace.length, serostatus) { 
+  -loglik(p=plogis(a+b*carapace.length),serostatus)
+}
+
+fit_logit<- mle2(logitnll,start=list(a=0,b=0),data=gt1)
+coef(fit_logit)
+
+```
+
+###Exercise 1
+
+Here we're modeling the force of infection as a constant hazard function.  We will use this to estimate the force of infection.
+
+```{r}
+haznll<-function(lambda,carapace.length,serostatus){
+  -loglik(p=1-exp(-lambda*carapace.length),serostatus)  # The pobability of being seropositive (1) is 1-exp(-lambda*a) the prob of being seronegative
+}
+```
+
+In order to get an idea for a starting point for lambda I'll look across the ages and see how the parameter changes.  To do this I'll group the data together by carapace.length in bins of 25 mm and estimate the age of the group as the mean of the carapace length.  Here I am looking at the probability of being serotype negative as this is what is most apparent from the equation linking probability and carapace length in the survival approach.
+
+```{r}
+groups<-seq(range(gt1$carapace.length)[1],range(gt1$carapace.length)[2],by=25)
+groups<-c(groups,range(gt1$carapace.length)[2])
+gt1$group<-apply(gt1,1,function(x) min(which(groups>=as.numeric(x["carapace.length"]))))
+
+moments<-ddply(gt1,~group, summarize, age=mean(carapace.length),neg=length(which(serostatus==0)),total.obs=length(serostatus),p.neg=neg/total.obs,lambda = log(p.neg)/(-age))
+
+moments
+ranges<-range(subset(moments,lambda!=0)['lambda'])
+```
+From here we can see that when $\lambda$ is not 0 it ranges between 0.001 and 0.01.  I'll start mle2 at 0.005. 
+
+> Nice job.
+
+```{r}
+fit<-mle2(minuslogl = haznll,start = list(lambda=0.005),data=gt1)
+
+summary(fit)
+confint(fit)
+```
+
+With the model above I estimate the force of infection to be 0.0057 with $\text{mm}^{-1}$ as units with a 95% confidence interval of 0.0046 to 0.0069.  Which seems pretty tight around lambda.  
+```{r}
+params <- data.frame(lambda=seq(0.0001,0.05,by=0.0001))
+                      
+
+ddply(params,~lambda,mutate,
+      loglik=with(gt1,-haznll(lambda,carapace.length,serostatus))) -> params
+
+maxloglike<-with(gt1,-haznll(coef(fit),carapace.length,serostatus))
+
+crit <- qchisq(p=0.95,df=1)/2 
+
+p1 <- ggplot(data=params,mapping=aes(x=lambda,y=loglik))+ 
+  geom_line()+ggtitle("Likelihood Surface")+
+  geom_hline(yintercept=c(maxloglike-crit),color="red")+
+  geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit]),linetype=2,color="red")+
+  ylim(-90,-80)+
+  xlim(0,0.015)+
+  geom_point(aes(x=coef(fit),y=maxloglike),size=5)
+
+crit2 <- qchisq(p=0.999,df=1)/2 
+
+p1 <- p1+geom_hline(yintercept=c(maxloglike-crit2),color="blue")+
+  geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit2]),linetype=2,color="blue")
+
+crit3 <- qchisq(p=0.50,df=1)/2
+
+p1<-p1+geom_hline(yintercept=c(maxloglike-crit3),color="green")+
+  geom_vline(xintercept=range(params$lambda[params$loglik>maxloglike-crit3]),linetype=2,color="green")
+
+p1 + scale_color_manual(values=c("red", "blue", "green"), 
+                       name="Confidence intervals",
+                       labels=c("95%", "99%", "50%"))
+```
+
+> How about, instead:
+
+```{r}
+cis <- data.frame(level=c(0.5,0.95,0.99))
+cis <- ddply(cis,~level,mutate,
+             lev=paste0(level*100,"%"),
+             crit=maxloglike-qchisq(p=level,df=1)/2,
+             lo=min(range(params$lambda[params$loglik>crit])),
+             hi=max(range(params$lambda[params$loglik>crit]))
+             )
+
+ggplot(data=cis,mapping=aes(color=lev))+ 
+  geom_line(data=params,mapping=aes(x=lambda,y=loglik),color='black')+
+  geom_hline(aes(yintercept=crit,color=lev))+
+  geom_vline(aes(xintercept=lo,color=lev),linetype=2)+
+  geom_vline(aes(xintercept=hi,color=lev),linetype=2)+
+  labs(title="Likelihood Surface",
+       x=expression(lambda),y=expression(log~L),
+       color="confidence level")+
+  ylim(maxloglike+c(-10,0))+
+  xlim(0,0.015)+
+  geom_point(aes(x=coef(fit),y=maxloglike),size=5)
+```
+
+The model certainly has a different shape when compared to the logistic regression done in class, but just by looking at the fit I wouldn't say this one is better.  In fact it seems a little worse.  There seems to be a threshold in the data after which the probability for serotype positive increases rapidly that behavior is not captured here.
+
+> Good observation.
+
+```{r}
+mutate(gt1,fitted=with(as.list(coef(fit)),1-exp(-lambda*carapace.length))) -> gt1
+ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted),color='black')
+
+```
+
+
+
+### Exercise 2
+For this exercise I am modeling the force of infection as Michaelis-Menton function so $\lambda$ is given by
+
+$$
+\lambda (a) = \frac{\lambda_1 a}{a + \lambda_2}
+$$
+
+By plotting the likelihood surface we can see that the model depends greatly on the value of $\lambda_1$, the maximum force of infection, while there is almost no information in $\lambda_2$ so long as it is within bonds that produce a finite number.
+
+> I don't think you've done your integral correctly.  I get:
+$$\int_0^L \lambda(a)\,da = \lambda_1\,L-\lambda_1\,\lambda_2\,\log{\left(1+\frac{L}{\lambda_2}\right)}$$
+> I suggest you redo Exercises 2 and 3 with the corrected formulae.
+
+```{r}
+
+
+nll<-function(lambda1,lambda2,carapace.length,serostatus){
+  prob<-1-exp(-(lambda1*carapace.length-lambda1*lambda2*log(1+(carapace.length/lambda2))))
+  #print(lambda1)
+  #print(lambda2)
+  ll<- -loglik(p=prob,serostatus)
+  #print(ll)
+  
+  }
+
+prob<-function(lambda1,lambda2){
+  carapace.length<-100
+  print(1-exp(-(lambda1*carapace.length-lambda1*lambda2*log(1+(carapace.length/lambda2)))))
+}
+
+params <- expand.grid(lambda1=seq(0.001,.1,length.out = 100),
+                      lambda2=seq(1,1000,length.out=100))
+ddply(params,~lambda1+lambda2,mutate,
+      loglik=with(gt1,-nll(lambda1,lambda2,carapace.length,serostatus))) -> params
+
+ggplot(data=params,mapping=aes(x=lambda1,y=lambda2,z=loglik))+
+ geom_tile(aes(fill=loglik))+geom_contour(binwidth=2,color="black")  
+
+
+```
+
+I'll try to fit the model using mle2; however, as we can see from the output the optimizer isn't able to converge on a maximum. This is most likely due to the lack of information in $\lambda _2$.  Many options are avialable and don't really make the fit any better.
+
+```{r}
+fit2<-mle2(minuslogl = nll,start = list(lambda1=0.05,lambda2=750),data=gt1)
+summary(fit2)
+
+breaks <- logLik(fit2)-qchisq(p=c(0.5,0.8,0.9,0.95,0.99,0.999,0.9999),df=2)/2
+ggplot(data=params,mapping=aes(x=lambda1,y=lambda2,z=loglik))+
+  stat_contour(aes(color=..level..),breaks=breaks)+
+  geom_point(x=coef(fit2)["lambda1"],y=coef(fit2)["lambda2"],shape=3)+
+  labs(color=expression(log(L)))
+
+```
+
+
+I'll use the estimates given by mle2 to monitor how the force of infection changes with age.
+```{r}
+mutate(gt1,fitted2=with(as.list(coef(fit2)),1-exp(-(lambda1*carapace.length-lambda1*lambda2*log(1+(carapace.length/lambda2))))),
+       force.i=with(as.list(coef(fit2)),(lambda1*(carapace.length))/(carapace.length+lambda2))) -> gt1
+
+ggplot(data=gt1,mapping=aes(x=carapace.length,y=force.i))+geom_line()
+```
+
+It looks like over the range of the data set, we don't employ the characteristic curve of the Mechaelis-Menton model, suggesting the model isn't particularly suited for this data.
+
+The insensitivity of the model to $\lambda _2$ is really highlighted, by looking at the model fit compared with the same model using a much higher $\lambda _2$.  Here I have plotted fit for the mle2 estimates in black and the red line is the fit given a $\lambda _2$ that is 100 times larger.  As we can see there isn't much a difference in the fits.
+
+```{r}
+
+ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted2,color='MM'))+geom_line(aes(y=fitted,color="Constant"))                                                                                                                                                       
+
+```
+
+### Exercise 3
+
+Here we'll compare the two models used above with one another as well as with the logit model used in class.  Unfortunately none of these models are nested.  I tried to reduce my model in *exercise 2* to the constant hazard but it is not possible to constrain the parameters in the two parameter model in such a way we can reduce it to the constant hazard.  The a in the denominator of $\frac{\lambda _1 * a}{a + \lambda _2}$ makes this impossible.  I have included below in an appendix the work I did with a linear model.  This and the constant hazard model are nested and discussed below.  
+
+The AIC for these models suggests, the logit fits the data better than do the others I tried.
+
+```{r}
+models<-c("Logit","Constant Hazard", "Michaelis_Menten")
+aic<-data.frame(AIC(fit_logit,fit,fit2))
+cbind(models,aic)
+mutate(gt1,fitted_logit=with(as.list(coef(fit_logit)),plogis(a+b*carapace.length))) -> gt1
+ggplot(data=gt1,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted2,color='MM Michaelis_Menten Hazard')) +geom_line(aes(y=fitted_logit,color="Logit")) +geom_line(aes(y=fitted,color="Constant Hazard") )
+```
+
+Plotting the data and the model fits above also helps to see that the logit model fits the best.  This might be due the constraints of the exponential used in the other models.  In those the probability of being seropositive follows $1-exp(-\lambda (a))$ for some function $\lambda (a)$.  I think constraining the range of $1-exp(-x)$ to [0,1] as we have to do here limits the shape of these fits.  I'd be interested to know your thoughts as well.  
+
+Initially I thought another way to see which model fits best could be devising some means of measuring residuals. After thinking about this more I would generally be doing the likelihood ratio test. I would be asking how  similar is my model to the data which I believe is almost the same as how likely would I be to observe the data if my model was right.  If I was looking for some biological process and wanted to see which model best described this process I could split the data up by taking every other data point.  I could then train each model on half the data.  In order to see which model was more reliable I would then see which one fit the non-training set best.  Again for this I would use the AIC as the models aren't nested.
+
+
+### Appendix : Linear force of infection
+
+Initially I binned the data by carapace length with binwidths of 25mm and estimated a force of infection for each bin.  This suggested a linear model for exercise 2.
+
+```{r}
+
+ggplot(data=subset(moments,lambda!=0),mapping=aes(x=age, y= lambda))+geom_point(size=3)
+```
+This should give a rough estimate as I took averages over age groups and calculated a lambda for each group, but it seems like a linear model would work especially for the 125mm to 250 mm range.  So my model was
+
+$$
+\lambda (a) = m \cdot a + b
+$$
+
+I abandoned this model since it was possible (with a favorable log likelihood) to have a negative intercept which is not biologically possible as it would result in a negative probability.
+
+The log-likelihood, plotted below, showed that there was a ridge along which there was not much data to suggest a maximum.  This ridge, even at its highest point drops leads very quickly to parameter values that produce impossible probabilities and so it was not possible to use mle2 to estimate a maximum.
+
+```{r}
+lin_nll<-function(b,m,carapace.length,serostatus){
+  prob<-1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))
+  ll<- -loglik(p=prob,serostatus)
+}
+params <- expand.grid(b=seq(-0.001,0.01,by=0.0001),
+                      m=seq(-0.000001,0.0001,0.00001))
+ddply(params,~b+m,mutate,
+      loglik=with(gt1,-lin_nll(b,m,carapace.length,serostatus))) -> params
+
+p1<-as.list(c("b"=0.001,"m"=5e-5))
+p2<-as.list(c("b"=0.004,"m"=2.5e-5))
+ggplot(data=params,mapping=aes(x=m,y=b,z=loglik))+
+ geom_tile(aes(fill=loglik))+scale_fill_gradient2(low=muted("blue"),mid="white",
+                        high=muted("red"),midpoint=-150)+
+  geom_contour(binwidth=1,color="black") +geom_point(aes(x=5e-5,y=0.001))+geom_point(x=2.5e-5,y=0.004)
+
+
+```
+
+To show the similar fits given by values along the ridge I choose two parameter combinations and plotted their fits with the data.
+
+```{r}
+
+mutate(gt1,fitted2=with(p1,1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length))),
+       fitted3=with(p2,1-exp(-((m/2)*(carapace.length)^2 + b*carapace.length)))) -> gt3
+
+ggplot(data=gt3,mapping=aes(x=carapace.length,color=elisa)) + geom_point(aes(y=serostatus),position='jitter')+ geom_line(aes(y=fitted2,color='P1'))+geom_line(aes(y=fitted3,,color='P2'))
+
+```
+
+From a biological standpoint these two estimations are essential the same.  
+
+This and the constant hazard model are nested since if I constrain m to 0 in the linear model I reduce the linear model to the constant hazard.  I was unable to calculate the maximum log-likelihood for my linear model, so I can't use the log likelihood ratio to compare these models, but for practice I'll use my estimated parameters from above to get a ballpark comparison.  This should give me a lower bound on the log likelihood ratio.  If I were to know the real maximum point for the linear model the test statistic could be equal to or greater than that given here. I'll be using the parameters b = 0.001 and m = $5e^{-5}$.
+
+```{r}
+log_ratio<--2*(logLik(fit)-with(gt1,-lin_nll(b=0.001,m=5e-5,carapace.length,serostatus)))
+
+1-pchisq(log_ratio,df=2-1)
+
+
+```
+
+So we reject the null hypothesis in favor of the two-parameter module fitting the data better, even at the unlikely maximum.
+
+Is it fair to use this analysis as a lower bound when the true maximum is unknown?
